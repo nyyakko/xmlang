@@ -29,12 +29,13 @@ struct Token
         KEYWORD,
         LITERAL,
         IDENTIFIER,
+        END_OF_FILE
     )
 
-    std::string data;
-    Type type;
-    Location location;
-    size_t depth;
+    std::string data {};
+    Type type {};
+    Location location {};
+    size_t depth {};
 };
 
 bool operator==(Token const& lhs, Token const& rhs)
@@ -200,6 +201,8 @@ std::vector<Token> tokenize(std::filesystem::path const& path)
 {
     std::vector<Token> tokens {};
 
+    size_t lineCount = 0;
+
     for (auto const& [line, number] : next_file_line(path))
     {
         for (auto token : next_token(line))
@@ -208,7 +211,16 @@ std::vector<Token> tokenize(std::filesystem::path const& path)
             token.location.second.first = number;
             tokens.push_back(token);
         }
+
+        lineCount += 1;
     }
+
+    tokens.push_back({
+        .data = "EOF",
+        .type = Token::Type::END_OF_FILE,
+        .location = { path, { lineCount-1, 0 } },
+        .depth = 0
+    });
 
     std::reverse(tokens.begin(), tokens.end());
 
@@ -366,7 +378,8 @@ public:
         UNEXPECTED_TOKEN_REACHED,
         EXPECTED_TOKEN_MISSING,
         ENCLOSING_TOKEN_MISSING,
-        ENCLOSING_TOKEN_UNMATCHING
+        ENCLOSING_TOKEN_UNMATCHING,
+        UNEXPECTED_END_OF_FILE
     )
 
 public:
@@ -400,7 +413,18 @@ private:
 
 bool hadAnError_g = false;
 
-void emit_error(ParserError::Type const& error);
+void emit_error(ParserError::Type const& error)
+{
+    switch (error)
+    {
+    case ParserError::Type::UNEXPECTED_END_OF_FILE: {
+        std::cout << RED << "[error]" << RESET << ": unexpected end of file reached\n";
+        break;
+    }
+    }
+
+    std::cout << '\n';
+}
 
 void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens)
 {
@@ -421,15 +445,8 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
         auto& [file, position] = location;
         auto& [line, column] = position;
 
-        static Token previous {};
-
-        if (token == previous)
-        {
-            return;
-        }
-
         auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = lines.at(line).substr(1+column);
+        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
 
         std::cout << RED << "[error]" << RESET << ": function declared without a name\n";
         std::cout << '\n';
@@ -457,15 +474,8 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
         auto& [file, position] = location;
         auto& [line, column] = position;
 
-        static Token previous {};
-
-        if (token == previous)
-        {
-            return;
-        }
-
         auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = lines.at(line).substr(1+column);
+        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
 
         std::cout << RED << "[error]" << RESET << ": unexpected token\n";
         std::cout << '\n';
@@ -485,8 +495,6 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
 
         std::cout << CYAN << "\nhint: removing it may help\n" << RESET;
 
-        previous = token;
-
         break;
     }
     case ParserError::Type::EXPECTED_TOKEN_MISSING: {
@@ -495,15 +503,8 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
         auto& [file, position] = location;
         auto& [line, column] = position;
 
-        static Token previous {};
-
-        if (token == previous)
-        {
-            return;
-        }
-
         auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = lines.at(line).substr(1+column);
+        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
 
         std::cout << RED << "[error]" << RESET << ": missing expected token\n";
         std::cout << '\n';
@@ -521,8 +522,6 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
         std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
         std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << " this token is missing a " << tokens.at(1).data << '\n';
 
-        previous = token;
-
         break;
     }
     case ParserError::Type::ENCLOSING_TOKEN_MISSING: {
@@ -531,15 +530,8 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
         auto& [file, position] = location;
         auto& [line, column] = position;
 
-        static Token previous {};
-
-        if (token == previous)
-        {
-            return;
-        }
-
         auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = lines.at(line).substr(1+column);
+        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
 
         std::cout << RED << "[error]" << RESET << ": missing enclosing token\n";
         std::cout << '\n';
@@ -559,8 +551,6 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
 
         std::cout << CYAN << "\nhint: you seem to have broken tags somewhere\n" << RESET;
 
-        previous = token;
-
         break;
     }
     case ParserError::Type::ENCLOSING_TOKEN_UNMATCHING: {
@@ -570,15 +560,8 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
         auto& [file, position] = location;
         auto& [line, column] = position;
 
-        static Token previous {};
-
-        if (token == previous)
-        {
-            return;
-        }
-
         auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = lines.at(line).substr(1+column);
+        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
 
         std::cout << RED << "[error]" << RESET << ": unmatching tokens found\n";
         std::cout << '\n';
@@ -595,8 +578,6 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
 
         std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
         std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << " this token\n";
-
-        previous = token;
         }
         std::cout << '\n';
         {
@@ -605,15 +586,8 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
         auto& [file, position] = location;
         auto& [line, column] = position;
 
-        static Token previous {};
-
-        if (token == previous)
-        {
-            return;
-        }
-
         auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = lines.at(line).substr(1+column);
+        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
 
         std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
         std::cout << '\n';
@@ -628,8 +602,6 @@ void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens
 
         std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
         std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << " doesn't match with this one\n";
-
-        previous = token;
         }
 
         break;
