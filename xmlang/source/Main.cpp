@@ -851,18 +851,28 @@ Result<std::unique_ptr<Node>> parse_let(std::vector<Token> const& tokens, int& c
 
     letStmt->name = properties.at("name");
 
+    if (properties.contains("value"))
+    {
+        auto literal = std::make_unique<LiteralExpr>();
+        literal->value = properties.at("value");
+        letStmt->value = std::move(literal);
+    }
+
     if (!letStmt->value)
     {
-        auto expression = parse_expression(tokens, cursor);
+        auto value = TRY(parse_expression(tokens, cursor));
 
-        if (expression.has_value() && expression.value())
+        if (value)
         {
-            letStmt->value = std::move(expression.value());
+            letStmt->value = std::move(value);
         }
-
-        if (!expression.has_value())
+        else
         {
-            synchronize(tokens, token, cursor);
+            Token expected {};
+            expected.type = Token::Type::IDENTIFIER;
+            expected.data = "value";
+            emit_error(ParserError::EXPECTED_TOKEN_MISSING, { token, expected });
+            return make_error({});
         }
     }
 
