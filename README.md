@@ -1,8 +1,8 @@
 # XMLang
 
-a programming language based on xml.\
+a programming language based on xml.
 
-you ask the why, and I ask why not. we are not the same.\
+why? I mean, why not. :^).
 
 # Building
 
