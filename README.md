@@ -1,8 +1,10 @@
 # XMLang
 
-A programming language based on xml.
+A (WIP) programming language based on xml.
 
-This project is still very early stage, so if you try to break it... well, what do you even expect?
+<img width="25%" alt="image" src="https://github.com/user-attachments/assets/cfc61819-3101-4ce1-879f-f3627f88ddf5" />\
+
+shout out to [beefviper](https://github.com/beefviper/)!!!
 
 # Building
 
@@ -23,5 +25,3 @@ python configure.py && python build.py
 ```
 
 Check [examples](examples/) for more usage examples.
-
-shout out to [beefviper](https://github.com/beefviper/)!!!
