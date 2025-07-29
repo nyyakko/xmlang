@@ -1,0 +1,11 @@
+<program>
+    <function name="sayHello" result="none">
+        <call name="println">
+            <arg>Hello, World!</arg>
+        </call>
+    </function>
+
+    <function name="main" result="none">
+        <call name="sayHello"></call>
+    </function>
+</program>
