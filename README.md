@@ -17,7 +17,7 @@ python configure.py && python build.py
 ```xml
 <program>
     <call name="println">
-        <arg>Hello, World!</arg>
+        <arg value="Hello, World!"></arg>
     </call>
 </program>
 ```
