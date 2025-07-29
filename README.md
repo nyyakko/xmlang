@@ -1,8 +1,8 @@
 # XMLang
 
-a programming language based on xml.
+A programming language based on xml.
 
-this project is still very early stage, so if you try to break it... well, what do you even expect?
+This project is still very early stage, so if you try to break it... well, what do you even expect?
 
 # Building
 
@@ -14,6 +14,14 @@ python configure.py && python build.py
 
 # Examples
 
-check [examples](examples/) for usage examples.
+```xml
+<program>
+    <call name="println">
+        <arg value="Hello, World!"></arg>
+    </call>
+</program>
+```
+
+Check [examples](examples/) for more usage examples.
 
 shout out to [beefviper](https://github.com/beefviper/)!!!
