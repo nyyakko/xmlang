@@ -9,7 +9,7 @@ CPMAddPackage(URI "gh:nyyakko/LibEnum#master"        EXCLUDE_FROM_ALL YES)
 CPMAddPackage(URI "gh:nyyakko/LibCoro#master"        EXCLUDE_FROM_ALL YES)
 CPMAddPackage(URI "gh:fmtlib/fmt#10.2.1"             EXCLUDE_FROM_ALL YES)
 CPMAddPackage(URI "gh:nlohmann/json@3.12.0"          EXCLUDE_FROM_ALL YES)
-CPMAddPackage(URI "gh:p-ranav/argparse@3.2"          EXCLUDE_FROM_ALL YES)
+CPMAddPackage(URI "gh:nyyakko/argparse#master"       EXCLUDE_FROM_ALL YES)
 
 include(cmake/static_analyzers.cmake)
 

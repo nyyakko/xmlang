@@ -1282,7 +1282,7 @@ Result<void> safe_main(std::span<char const*> arguments)
 
     auto tokens = tokenize(source);
 
-    if (args.is_used("--dump") && args.get<std::string>("--dump") == "tokens")
+    if (args.has_value("--dump") && args.get<std::string>("--dump") == "tokens")
     {
         std::cout << std::setw(4) << dump_tokens(tokens);
         return {};
@@ -1295,7 +1295,7 @@ Result<void> safe_main(std::span<char const*> arguments)
         return make_error("I give up. ( ; ω ; )");
     }
 
-    if (args.is_used("--dump") && args.get<std::string>("--dump") == "ast")
+    if (args.has_value("--dump") && args.get<std::string>("--dump") == "ast")
     {
         std::cout << std::setw(4) << dump_ast(ast.value()) << '\n';
         return {};
