@@ -1,5 +1,0 @@
-<program>
-    <call name="println">
-        <arg value="Hello, World!"></arg>
-    </call>
-</program>
