@@ -685,17 +685,15 @@ Result<std::unique_ptr<Node>, ParserError> parse_expression(std::vector<Token> c
     return {};
 }
 
-Result<std::unique_ptr<Node>, ParserError> parse_argument(std::vector<Token> const& tokens, int& cursor)
+Result<std::pair<Token, std::unordered_map<std::string, std::string>>, ParserError> parse_opening_tag(std::vector<Token> const& tokens, int& cursor, std::string_view tag)
 {
-    auto argumentStmt = std::make_unique<ArgumentStmt>();
-
     if (!advance_if_present(tokens, cursor, Token::Type::LEFT_ANGLE))
     {
         emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
         return make_error<ParserError>({});
     }
 
-    auto token = advance_if_present(tokens, cursor, Token::Type::KEYWORD, "arg");
+    auto token = advance_if_present(tokens, cursor, Token::Type::KEYWORD, tag);
 
     if (!token)
     {
@@ -703,502 +701,9 @@ Result<std::unique_ptr<Node>, ParserError> parse_argument(std::vector<Token> con
         return make_error<ParserError>({});
     }
 
-    if (peek_cursor(tokens, cursor).type == Token::Type::IDENTIFIER)
-    {
-        if (!advance_if_present(tokens, cursor, Token::Type::IDENTIFIER, "value"))
-        {
-            Token expected {};
-            expected.type = Token::Type::IDENTIFIER;
-            expected.data = "value";
-            emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { *token, expected });
-            return make_error<ParserError>({});
-        }
+    std::unordered_map<std::string, std::string> properties {};
 
-        if (!advance_if_present(tokens, cursor, Token::Type::EQUAL))
-        {
-            Token expected {};
-            expected.type = Token::Type::EQUAL;
-            expected.data = "=";
-            emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-            return make_error<ParserError>({});
-        }
-
-        if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-        {
-            Token expected {};
-            expected.type = Token::Type::QUOTE;
-            expected.data = "\"\"";
-            emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-            return make_error<ParserError>({});
-        }
-
-        argumentStmt->value = TRY(parse_expression(tokens, cursor));
-
-        if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-        {
-            Token expected {};
-            expected.type = Token::Type::QUOTE;
-            expected.data = "\"";
-            emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-            return make_error<ParserError>({});
-        }
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::RIGHT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!argumentStmt->value)
-    {
-        auto value = TRY(parse_expression(tokens, cursor));
-
-        if (value)
-        {
-            argumentStmt->value = std::move(value);
-        }
-        else
-        {
-            Token expected {};
-            expected.type = Token::Type::IDENTIFIER;
-            expected.data = "value";
-            emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { *token, expected });
-            return make_error<ParserError>({});
-        }
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::LEFT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::SLASH))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::KEYWORD, "arg"))
-    {
-        emit_error(ParserError::Type::ENCLOSING_TOKEN_MISSING, { *token });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::RIGHT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    return argumentStmt;
-}
-
-Result<std::unique_ptr<Node>, ParserError> parse_call(std::vector<Token> const& tokens, int& cursor)
-{
-    auto callStmt = std::make_unique<CallStmt>();
-
-    if (!advance_if_present(tokens, cursor, Token::Type::LEFT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    auto token = advance_if_present(tokens, cursor, Token::Type::KEYWORD, "call");
-
-    if (!token)
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::IDENTIFIER, "name"))
-    {
-        Token expected {};
-        expected.type = Token::Type::IDENTIFIER;
-        expected.data = "name";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { *token, expected });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::EQUAL))
-    {
-        Token expected {};
-        expected.type = Token::Type::EQUAL;
-        expected.data = "=";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-    {
-        Token expected {};
-        expected.type = Token::Type::QUOTE;
-        expected.data = "\"\"";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    auto callee = advance_if_present(tokens, cursor, Token::Type::LITERAL);
-
-    if (!callee)
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    callStmt->callee = callee->data;
-
-    if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-    {
-        Token expected {};
-        expected.type = Token::Type::QUOTE;
-        expected.data = "\"";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { *token, expected });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::RIGHT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    while (cursor > 0 && peek_cursor(tokens, cursor).depth > token->depth)
-    {
-        auto argument = parse_argument(tokens, cursor);
-
-        if (argument.has_value() && argument.value())
-        {
-            callStmt->arguments.push_back(std::move(argument.value()));
-            continue;
-        }
-
-        if (!argument.has_value())
-        {
-            synchronize(tokens, *token, cursor);
-            continue;
-        }
-
-        break;
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::LEFT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::SLASH))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::KEYWORD, "call"))
-    {
-        emit_error(ParserError::Type::ENCLOSING_TOKEN_UNMATCHING, { *token, peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::RIGHT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    return callStmt;
-}
-
-Result<std::unique_ptr<Node>, ParserError> parse_let(std::vector<Token> const& tokens, int& cursor)
-{
-    auto letStmt = std::make_unique<LetStmt>();
-
-    if (!advance_if_present(tokens, cursor, Token::Type::LEFT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    auto token = advance_if_present(tokens, cursor, Token::Type::KEYWORD, "let");
-
-    if (!token)
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::IDENTIFIER, "name"))
-    {
-        Token expected {};
-        expected.type = Token::Type::IDENTIFIER;
-        expected.data = "name";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { *token, expected });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::EQUAL))
-    {
-        Token expected {};
-        expected.type = Token::Type::EQUAL;
-        expected.data = "=";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-    {
-        Token expected {};
-        expected.type = Token::Type::QUOTE;
-        expected.data = "\"\"";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    auto name = advance_if_present(tokens, cursor, Token::Type::LITERAL);
-
-    if (!name)
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    letStmt->name = name->data;
-
-    if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-    {
-        Token expected {};
-        expected.type = Token::Type::QUOTE;
-        expected.data = "\"";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    if (peek_cursor(tokens, cursor).type == Token::Type::IDENTIFIER)
-    {
-        if (!advance_if_present(tokens, cursor, Token::Type::IDENTIFIER, "value"))
-        {
-            Token expected {};
-            expected.type = Token::Type::IDENTIFIER;
-            expected.data = "value";
-            emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { *token, expected });
-            return make_error<ParserError>({});
-        }
-
-        if (!advance_if_present(tokens, cursor, Token::Type::EQUAL))
-        {
-            Token expected {};
-            expected.type = Token::Type::EQUAL;
-            expected.data = "=";
-            emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-            return make_error<ParserError>({});
-        }
-
-        if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-        {
-            Token expected {};
-            expected.type = Token::Type::QUOTE;
-            expected.data = "\"\"";
-            emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-            return make_error<ParserError>({});
-        }
-
-        letStmt->value = TRY(parse_expression(tokens, cursor));
-
-        if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-        {
-            Token expected {};
-            expected.type = Token::Type::QUOTE;
-            expected.data = "\"";
-            emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-            return make_error<ParserError>({});
-        }
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::RIGHT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!letStmt->value)
-    {
-        auto expression = parse_expression(tokens, cursor);
-
-        if (expression.has_value() && expression.value())
-        {
-            letStmt->value = std::move(expression.value());
-        }
-
-        if (!expression.has_value())
-        {
-            synchronize(tokens, *token, cursor);
-        }
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::LEFT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::SLASH))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::KEYWORD, "let"))
-    {
-        emit_error(ParserError::Type::ENCLOSING_TOKEN_UNMATCHING, { *token, peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::RIGHT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    return letStmt;
-}
-
-Result<std::unique_ptr<Node>, ParserError> parse_statement(std::vector<Token> const& tokens, int& cursor)
-{
-    if (peek_cursor(tokens, cursor, 1).data == "let")
-    {
-        return parse_let(tokens, cursor);
-    }
-
-    if (peek_cursor(tokens, cursor, 1).data == "call")
-    {
-        return parse_call(tokens, cursor);
-    }
-
-    return {};
-}
-
-bool next_is_statement(std::vector<Token> const& tokens, int& cursor)
-{
-    return
-        peek_cursor(tokens, cursor, 1).data == "let" ||
-        peek_cursor(tokens, cursor, 1).data == "call" ||
-        peek_cursor(tokens, cursor, 1).data == "arg"
-        ;
-}
-
-Result<std::unique_ptr<Node>, ParserError> parse_function(std::vector<Token> const& tokens, int& cursor)
-{
-    auto functionDecl = std::make_unique<FunctionDecl>();
-
-    if (!advance_if_present(tokens, cursor, Token::Type::LEFT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    auto token = advance_if_present(tokens, cursor, Token::Type::KEYWORD, "function");
-
-    if (!token)
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::IDENTIFIER, "name"))
-    {
-        Token expected {};
-        expected.type = Token::Type::IDENTIFIER;
-        expected.data = "name";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { *token, expected });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::EQUAL))
-    {
-        Token expected {};
-        expected.type = Token::Type::EQUAL;
-        expected.data = "=";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-    {
-        Token expected {};
-        expected.type = Token::Type::QUOTE;
-        expected.data = "\"\"";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    auto name = advance_if_present(tokens, cursor, Token::Type::LITERAL);
-
-    if (!name)
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    functionDecl->name = name->data;
-
-    if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-    {
-        Token expected {};
-        expected.type = Token::Type::QUOTE;
-        expected.data = "\"";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::IDENTIFIER, "result"))
-    {
-        Token expected {};
-        expected.type = Token::Type::IDENTIFIER;
-        expected.data = "result";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { *token, expected });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::EQUAL))
-    {
-        Token expected {};
-        expected.type = Token::Type::EQUAL;
-        expected.data = "=";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-    {
-        Token expected {};
-        expected.type = Token::Type::QUOTE;
-        expected.data = "\"\"";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    auto result = advance_if_present(tokens, cursor, Token::Type::LITERAL);
-
-    if (!result)
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    functionDecl->result = result->data;
-
-    if (!advance_if_present(tokens, cursor, Token::Type::QUOTE))
-    {
-        Token expected {};
-        expected.type = Token::Type::QUOTE;
-        expected.data = "\"";
-        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { peek_cursor(tokens, cursor, -1), expected });
-        return make_error<ParserError>({});
-    }
-
-    while (cursor > 0 && peek_cursor(tokens, cursor).type == Token::Type::IDENTIFIER)
+    while (cursor > 1 && peek_cursor(tokens, cursor).type == Token::Type::IDENTIFIER)
     {
         auto parameterName = advance_if_present(tokens, cursor, Token::Type::IDENTIFIER);
 
@@ -1243,7 +748,7 @@ Result<std::unique_ptr<Node>, ParserError> parse_function(std::vector<Token> con
             return make_error<ParserError>({});
         }
 
-        functionDecl->parameters.push_back({ parameterName->data, parameterType->data });
+        properties[parameterName->data] = parameterType->data;
     }
 
     if (!advance_if_present(tokens, cursor, Token::Type::RIGHT_ANGLE))
@@ -1252,25 +757,11 @@ Result<std::unique_ptr<Node>, ParserError> parse_function(std::vector<Token> con
         return make_error<ParserError>({});
     }
 
-    while (cursor > 0 && peek_cursor(tokens, cursor).depth > token->depth)
-    {
-        auto statement = parse_statement(tokens, cursor);
+    return std::make_pair(*token , properties);
+}
 
-        if (statement.has_value() && statement.value())
-        {
-            functionDecl->scope.push_back(std::move(statement.value()));
-            continue;
-        }
-
-        if (!statement.has_value())
-        {
-            synchronize(tokens, *token, cursor);
-            continue;
-        }
-
-        break;
-    }
-
+Result<void, ParserError> parse_closing_tag(std::vector<Token> const& tokens, int& cursor, Token const& token)
+{
     if (!advance_if_present(tokens, cursor, Token::Type::LEFT_ANGLE))
     {
         emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
@@ -1283,9 +774,9 @@ Result<std::unique_ptr<Node>, ParserError> parse_function(std::vector<Token> con
         return make_error<ParserError>({});
     }
 
-    if (!advance_if_present(tokens, cursor, Token::Type::KEYWORD, "function"))
+    if (!advance_if_present(tokens, cursor, Token::Type::KEYWORD, token.data))
     {
-        emit_error(ParserError::Type::ENCLOSING_TOKEN_UNMATCHING, { *token, peek_cursor(tokens, cursor) });
+        emit_error(ParserError::Type::ENCLOSING_TOKEN_MISSING, { token });
         return make_error<ParserError>({});
     }
 
@@ -1294,6 +785,189 @@ Result<std::unique_ptr<Node>, ParserError> parse_function(std::vector<Token> con
         emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
         return make_error<ParserError>({});
     }
+
+    return {};
+}
+
+Result<std::unique_ptr<Node>, ParserError> parse_argument(std::vector<Token> const& tokens, int& cursor)
+{
+    auto argumentStmt = std::make_unique<ArgumentStmt>();
+
+    auto [token, _] = TRY(parse_opening_tag(tokens, cursor, "arg"));
+
+    if (!argumentStmt->value)
+    {
+        auto value = TRY(parse_expression(tokens, cursor));
+
+        if (value)
+        {
+            argumentStmt->value = std::move(value);
+        }
+        else
+        {
+            Token expected {};
+            expected.type = Token::Type::IDENTIFIER;
+            expected.data = "value";
+            emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { token, expected });
+            return make_error<ParserError>({});
+        }
+    }
+
+    TRY(parse_closing_tag(tokens, cursor, token));
+
+    return argumentStmt;
+}
+
+Result<std::unique_ptr<Node>, ParserError> parse_call(std::vector<Token> const& tokens, int& cursor)
+{
+    auto callStmt = std::make_unique<CallStmt>();
+
+    auto [token, properties] = TRY(parse_opening_tag(tokens, cursor, "call"));
+
+    if (!properties.contains("name"))
+    {
+        Token expected {};
+        expected.type = Token::Type::IDENTIFIER;
+        expected.data = "name";
+        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { token, expected });
+        return make_error<ParserError>({});
+    }
+
+    callStmt->callee = properties.at("name");
+
+    while (cursor > 0 && peek_cursor(tokens, cursor).depth > token.depth)
+    {
+        auto argument = parse_argument(tokens, cursor);
+
+        if (argument.has_value() && argument.value())
+        {
+            callStmt->arguments.push_back(std::move(argument.value()));
+            continue;
+        }
+
+        if (!argument.has_value())
+        {
+            synchronize(tokens, token, cursor);
+            continue;
+        }
+
+        break;
+    }
+
+    TRY(parse_closing_tag(tokens, cursor, token));
+
+    return callStmt;
+}
+
+Result<std::unique_ptr<Node>, ParserError> parse_let(std::vector<Token> const& tokens, int& cursor)
+{
+    auto letStmt = std::make_unique<LetStmt>();
+
+    auto [token, properties] = TRY(parse_opening_tag(tokens, cursor, "let"));
+
+    if (!properties.contains("name"))
+    {
+        Token expected {};
+        expected.type = Token::Type::IDENTIFIER;
+        expected.data = "name";
+        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { token, expected });
+        return make_error<ParserError>({});
+    }
+
+    letStmt->name = properties.at("name");
+
+    if (!letStmt->value)
+    {
+        auto expression = parse_expression(tokens, cursor);
+
+        if (expression.has_value() && expression.value())
+        {
+            letStmt->value = std::move(expression.value());
+        }
+
+        if (!expression.has_value())
+        {
+            synchronize(tokens, token, cursor);
+        }
+    }
+
+    TRY(parse_closing_tag(tokens, cursor, token));
+
+    return letStmt;
+}
+
+Result<std::unique_ptr<Node>, ParserError> parse_statement(std::vector<Token> const& tokens, int& cursor)
+{
+    if (peek_cursor(tokens, cursor, 1).data == "let")
+    {
+        return parse_let(tokens, cursor);
+    }
+
+    if (peek_cursor(tokens, cursor, 1).data == "call")
+    {
+        return parse_call(tokens, cursor);
+    }
+
+    return {};
+}
+
+bool next_is_statement(std::vector<Token> const& tokens, int& cursor)
+{
+    return
+        peek_cursor(tokens, cursor, 1).data == "let" ||
+        peek_cursor(tokens, cursor, 1).data == "call" ||
+        peek_cursor(tokens, cursor, 1).data == "arg"
+        ;
+}
+
+Result<std::unique_ptr<Node>, ParserError> parse_function(std::vector<Token> const& tokens, int& cursor)
+{
+    auto functionDecl = std::make_unique<FunctionDecl>();
+
+    auto [token, properties] = TRY(parse_opening_tag(tokens, cursor, "function"));
+
+    if (!properties.contains("name"))
+    {
+        Token expected {};
+        expected.type = Token::Type::IDENTIFIER;
+        expected.data = "name";
+        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { token, expected });
+        return make_error<ParserError>({});
+    }
+
+    functionDecl->name = properties.at("name");
+
+    if (!properties.contains("result"))
+    {
+        Token expected {};
+        expected.type = Token::Type::IDENTIFIER;
+        expected.data = "result";
+        emit_error(ParserError::Type::EXPECTED_TOKEN_MISSING, { token, expected });
+        return make_error<ParserError>({});
+    }
+
+    functionDecl->result = properties.at("result");
+
+    while (cursor > 0 && peek_cursor(tokens, cursor).depth > token.depth)
+    {
+        auto statement = parse_statement(tokens, cursor);
+
+        if (statement.has_value() && statement.value())
+        {
+            functionDecl->scope.push_back(std::move(statement.value()));
+            continue;
+        }
+
+        if (!statement.has_value())
+        {
+            synchronize(tokens, token, cursor);
+            continue;
+        }
+
+        break;
+    }
+
+    TRY(parse_closing_tag(tokens, cursor, token));
 
     return functionDecl;
 }
@@ -1319,27 +993,9 @@ Result<std::unique_ptr<Node>, ParserError> parse_program(std::vector<Token> cons
 {
     auto program = std::make_unique<ProgramDecl>();
 
-    if (!advance_if_present(tokens, cursor, Token::Type::LEFT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
+    auto [token, _] = TRY(parse_opening_tag(tokens, cursor, "program"));
 
-    auto token = advance_if_present(tokens, cursor, Token::Type::KEYWORD, "program");
-
-    if (!token)
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::RIGHT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    while (cursor > 0 && peek_cursor(tokens, cursor).depth == token->depth + 1)
+    while (cursor > 0 && peek_cursor(tokens, cursor).depth == token.depth + 1)
     {
         Result<std::unique_ptr<Node>, ParserError> node;
 
@@ -1354,7 +1010,7 @@ Result<std::unique_ptr<Node>, ParserError> parse_program(std::vector<Token> cons
 
         if (!node.has_value())
         {
-            synchronize(tokens, *token, cursor);
+            synchronize(tokens, token, cursor);
             continue;
         }
 
@@ -1372,29 +1028,7 @@ Result<std::unique_ptr<Node>, ParserError> parse_program(std::vector<Token> cons
         program->scope.push_back(std::move(call));
     }
 
-    if (!advance_if_present(tokens, cursor, Token::Type::LEFT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::SLASH))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::KEYWORD, "program"))
-    {
-        emit_error(ParserError::Type::ENCLOSING_TOKEN_UNMATCHING, { *token, peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
-
-    if (!advance_if_present(tokens, cursor, Token::Type::RIGHT_ANGLE))
-    {
-        emit_error(ParserError::Type::UNEXPECTED_TOKEN_REACHED, { peek_cursor(tokens, cursor) });
-        return make_error<ParserError>({});
-    }
+    TRY(parse_closing_tag(tokens, cursor, token));
 
     return program;
 }
