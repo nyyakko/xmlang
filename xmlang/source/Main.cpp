@@ -761,7 +761,14 @@ Result<std::unique_ptr<Node>> parse_argument(std::vector<Token> const& tokens, i
 {
     auto argumentStmt = std::make_unique<ArgumentStmt>();
 
-    auto [token, _] = TRY(parse_opening_tag(tokens, cursor, "arg"));
+    auto [token, properties] = TRY(parse_opening_tag(tokens, cursor, "arg"));
+
+    if (properties.contains("value"))
+    {
+        auto literal = std::make_unique<LiteralExpr>();
+        literal->value = properties.at("value");
+        argumentStmt->value = std::move(literal);
+    }
 
     if (!argumentStmt->value)
     {
