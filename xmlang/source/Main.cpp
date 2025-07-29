@@ -375,7 +375,7 @@ ENUM_CLASS(ParserError,
     UNEXPECTED_TOKEN_REACHED,
     EXPECTED_TOKEN_MISSING,
     ENCLOSING_TOKEN_MISSING,
-    ENCLOSING_TOKEN_UNMATCHING,
+    ENCLOSING_TOKEN_MISMATCH,
     UNEXPECTED_END_OF_FILE
 )
 
@@ -524,7 +524,7 @@ void emit_error(ParserError error, std::vector<Token> const& tokens)
 
         break;
     }
-    case ParserError::ENCLOSING_TOKEN_UNMATCHING: {
+    case ParserError::ENCLOSING_TOKEN_MISMATCH: {
         {
         auto& token = tokens.at(0);
         auto& [data, type, location, depth] = token;
@@ -534,7 +534,7 @@ void emit_error(ParserError error, std::vector<Token> const& tokens)
         auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
         auto afterToken  = column ? lines.at(line).substr(1+column) : "";
 
-        std::cout << RED << "[error]" << RESET << ": unmatching tokens found\n";
+        std::cout << RED << "[error]" << RESET << ": mismatching tokens found\n";
         std::cout << '\n';
         std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
         std::cout << '\n';
@@ -766,9 +766,14 @@ Result<void> parse_closing_tag(std::vector<Token> const& tokens, int& cursor, To
         return make_error({});
     }
 
-    if (!advance_if_present(tokens, cursor, Token::Type::KEYWORD, token.data))
+    if (auto closing = advance_if_present(tokens, cursor, Token::Type::KEYWORD); !closing)
     {
         emit_error(ParserError::ENCLOSING_TOKEN_MISSING, { token });
+        return make_error({});
+    }
+    else if (closing->data != token.data)
+    {
+        emit_error(ParserError::ENCLOSING_TOKEN_MISMATCH, { token, *closing });
         return make_error({});
     }
 
