@@ -14,26 +14,6 @@ python configure.py && python build.py
 
 # Examples
 
-## Hello, World!
-
-```xml
-<program>
-    <call name="println">
-        <arg value="Hello, World!"></arg>
-    </call>
-</program>
-```
-
-## Hello, World! (fancy)
-
-```xml
-<program>
-    <function name="main" result="none">
-        <call name="println">
-            <arg>Hello, World!</arg>
-        </call>
-    </function>
-</program>
-```
+check [examples](examples/) for usage examples.
 
 shout out to [beefviper](https://github.com/beefviper/)!!!
