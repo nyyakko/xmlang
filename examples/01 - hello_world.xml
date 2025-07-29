@@ -1,5 +1,6 @@
 <program>
     <function name="main" result="none">
+        <let name="age">9</let>
         <call name="println">
             <arg>Hello, World!</arg>
         </call>

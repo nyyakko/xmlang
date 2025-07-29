@@ -415,6 +415,10 @@ void emit_error(ParserError error, std::vector<Token> const& tokens)
         {
             beforeToken = beforeToken.substr(index);
         }
+        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
+        {
+            beforeToken = "";
+        }
 
         std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
         std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << " is missing the 'name' property\n";
@@ -443,6 +447,10 @@ void emit_error(ParserError error, std::vector<Token> const& tokens)
         if (index != std::string::npos)
         {
             beforeToken = beforeToken.substr(index);
+        }
+        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
+        {
+            beforeToken = "";
         }
 
         std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
@@ -473,6 +481,10 @@ void emit_error(ParserError error, std::vector<Token> const& tokens)
         {
             beforeToken = beforeToken.substr(index);
         }
+        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
+        {
+            beforeToken = "";
+        }
 
         std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
         std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << " this token is missing a " << tokens.at(1).data << '\n';
@@ -499,6 +511,10 @@ void emit_error(ParserError error, std::vector<Token> const& tokens)
         if (index != std::string::npos)
         {
             beforeToken = beforeToken.substr(index);
+        }
+        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
+        {
+            beforeToken = "";
         }
 
         std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
@@ -530,6 +546,10 @@ void emit_error(ParserError error, std::vector<Token> const& tokens)
         {
             beforeToken = beforeToken.substr(index);
         }
+        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
+        {
+            beforeToken = "";
+        }
 
         std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
         std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << " this token\n";
@@ -553,6 +573,10 @@ void emit_error(ParserError error, std::vector<Token> const& tokens)
         if (index != std::string::npos)
         {
             beforeToken = beforeToken.substr(index);
+        }
+        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
+        {
+            beforeToken = "";
         }
 
         std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
