@@ -2,6 +2,8 @@
 
 a programming language based on xml.
 
+this is its very on early stage, so if you try to break it... well, what do you even expect?
+
 # Building
 
 You will need a [C++23 compiler](https://github.com/llvm/llvm-project/releases) and [cmake](https://cmake.org/) installed.
