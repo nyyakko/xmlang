@@ -2,7 +2,7 @@
 
 a programming language based on xml.
 
-this is its very on early stage, so if you try to break it... well, what do you even expect?
+this project is still very early stage, so if you try to break it... well, what do you even expect?
 
 # Building
 
