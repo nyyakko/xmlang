@@ -61,7 +61,7 @@ Generator<std::pair<std::string, size_t>> next_file_line(std::filesystem::path c
     co_return;
 }
 
-static constexpr std::array TAGS {
+static constexpr std::array KEYWORDS {
     "arg",
     "call",
     "function",
@@ -182,7 +182,7 @@ Generator<Token> next_token(std::string_view line)
                 cursor++;
             }
 
-            if (std::find(TAGS.begin(), TAGS.end(), data) != TAGS.end())
+            if (std::find(KEYWORDS.begin(), KEYWORDS.end(), data) != KEYWORDS.end())
             {
                 co_yield Token { .data = data, .type = Token::Type::KEYWORD, .location = { {}, { {}, cursor } }, .depth = depth };
             }
