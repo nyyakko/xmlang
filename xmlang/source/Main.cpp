@@ -1724,8 +1724,7 @@ Result<void> safe_main(std::span<char const*> arguments)
 
     if (hadAnError_g)
     {
-        std::cout << "I give up. ( ; ω ; )\n";
-        return {};
+        return make_error("I give up. ( ; ω ; )");
     }
 
     if (args.is_used("--dump") && args.get<std::string>("--dump") == "ast")
