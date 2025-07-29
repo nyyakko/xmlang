@@ -32,10 +32,10 @@ struct Token
         END_OF_FILE
     )
 
-    std::string data {};
-    Type type {};
-    Location location {};
-    size_t depth {};
+    std::string data;
+    Type type;
+    Location location;
+    size_t depth;
 };
 
 bool operator==(Token const& lhs, Token const& rhs)
@@ -412,19 +412,6 @@ private:
 };
 
 bool hadAnError_g = false;
-
-void emit_error(ParserError::Type const& error)
-{
-    switch (error)
-    {
-    case ParserError::Type::UNEXPECTED_END_OF_FILE: {
-        std::cout << RED << "[error]" << RESET << ": unexpected end of file reached\n";
-        break;
-    }
-    }
-
-    std::cout << '\n';
-}
 
 void emit_error(ParserError::Type const& error, std::vector<Token> const& tokens)
 {
