@@ -1705,7 +1705,14 @@ Result<void> safe_main(std::span<char const*> arguments)
         return liberror::make_error(exception.what());
     }
 
-    auto tokens = tokenize(args.get<std::string>("--file"));
+    auto source = args.get<std::string>("--file");
+
+    if (!std::filesystem::exists(source))
+    {
+        return make_error("source {} does not exist.", source);
+    }
+
+    auto tokens = tokenize(source);
 
     if (args.is_used("--dump") && args.get<std::string>("--dump") == "tokens")
     {
