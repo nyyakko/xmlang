@@ -1008,52 +1008,52 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
             switch (statement->stmt_type())
             {
             case Statement::Type::CALL: {
-                auto program = static_cast<CallStmt*>(statement);
+                auto callStmt = static_cast<CallStmt*>(statement);
 
                 ast = {{
-                    program->stmt_type(), {
-                        { "who", program->who },
+                    callStmt->stmt_type(), {
+                        { "who", callStmt->who },
                         { "arguments", nlohmann::json::array() }
                     }
                 }};
 
-                for (auto const& child : program->arguments)
+                for (auto const& child : callStmt->arguments)
                 {
-                    ast[program->stmt_type().to_string()]["arguments"].push_back(dump_ast(child));
+                    ast[callStmt->stmt_type().to_string()]["arguments"].push_back(dump_ast(child));
                 }
 
                 break;
             }
             case Statement::Type::ARGUMENT: {
-                auto argument = static_cast<ArgumentStmt*>(statement);
+                auto argumentStmt = static_cast<ArgumentStmt*>(statement);
 
                 ast = {{
-                    argument->stmt_type(), {
-                        { "value", dump_ast(argument->value) },
+                    argumentStmt->stmt_type(), {
+                        { "value", dump_ast(argumentStmt->value) },
                     }
                 }};
 
                 break;
             }
             case Statement::Type::RETURN: {
-                auto ret = static_cast<ReturnStmt*>(statement);
+                auto returnStmt = static_cast<ReturnStmt*>(statement);
 
                 ast = {{
-                    ret->stmt_type(), {
-                        { "value", ret->value ? dump_ast(ret->value) : "none" },
+                    returnStmt->stmt_type(), {
+                        { "value", returnStmt->value ? dump_ast(returnStmt->value) : "none" },
                     }
                 }};
 
                 break;
             }
             case Statement::Type::LET: {
-                auto let = static_cast<LetStmt*>(statement);
+                auto letStmt = static_cast<LetStmt*>(statement);
 
                 ast = {{
-                    let->stmt_type(), {
-                        { "name", let->name },
-                        { "type", let->type },
-                        { "value", dump_ast(let->value) },
+                    letStmt->stmt_type(), {
+                        { "name", letStmt->name },
+                        { "type", letStmt->type },
+                        { "value", dump_ast(letStmt->value) },
                     }
                 }};
 
@@ -1065,10 +1065,10 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 switch (expression->expr_type())
                 {
                 case Expression::Type::LITERAL: {
-                    auto literal = static_cast<LiteralExpr*>(expression);
+                    auto literalExpr = static_cast<LiteralExpr*>(expression);
                     ast = {{
-                        literal->expr_type(), {
-                            { "value", literal->value },
+                        literalExpr->expr_type(), {
+                            { "value", literalExpr->value },
                         }
                     }};
                     break;
@@ -1103,48 +1103,48 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 break;
             }
             case Declaration::Type::FUNCTION: {
-                auto function = static_cast<FunctionDecl*>(declaration);
+                auto functionDecl = static_cast<FunctionDecl*>(declaration);
 
                 ast = {{
-                    function->decl_type(), {
-                        { "name", function->name },
-                        { "result", function->result },
+                    functionDecl->decl_type(), {
+                        { "name", functionDecl->name },
+                        { "result", functionDecl->result },
                         { "parameters", nlohmann::json::array() },
                         { "scope", nlohmann::json::array() }
                     }
                 }};
 
-                for (auto const& parameter : function->parameters)
+                for (auto const& parameter : functionDecl->parameters)
                 {
-                    ast[function->decl_type().to_string()]["parameters"].push_back({ { "name", parameter.first }, { "type", parameter.second } });
+                    ast[functionDecl->decl_type().to_string()]["parameters"].push_back({ { "name", parameter.first }, { "type", parameter.second } });
                 }
 
                 for (auto const& child : declaration->scope)
                 {
-                    ast[function->decl_type().to_string()]["scope"].push_back(dump_ast(child));
+                    ast[functionDecl->decl_type().to_string()]["scope"].push_back(dump_ast(child));
                 }
 
                 break;
             }
             case Declaration::Type::CLASS: {
-                auto clazz = static_cast<ClassDecl*>(declaration);
+                auto classDecl = static_cast<ClassDecl*>(declaration);
 
                 ast = {{
-                    clazz->decl_type(), {
-                        { "name", clazz->name },
+                    classDecl->decl_type(), {
+                        { "name", classDecl->name },
                         { "inherits", nlohmann::json::array() },
                         { "scope", nlohmann::json::array() }
                     }
                 }};
 
-                for (auto const& parameter : clazz->inherits)
+                for (auto const& parameter : classDecl->inherits)
                 {
-                    ast[clazz->decl_type().to_string()]["inherits"].push_back(parameter);
+                    ast[classDecl->decl_type().to_string()]["inherits"].push_back(parameter);
                 }
 
                 for (auto const& child : declaration->scope)
                 {
-                    ast[clazz->decl_type().to_string()]["scope"].push_back(dump_ast(child));
+                    ast[classDecl->decl_type().to_string()]["scope"].push_back(dump_ast(child));
                 }
 
                 break;
