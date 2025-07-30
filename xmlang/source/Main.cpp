@@ -1504,157 +1504,12 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
     return ast;
 }
 
+/* FIXME: this stuff is implementation detail, which should be abstract away in a common Compiler class. */
+
 ENUM_CLASS(CompilerError,
     MISMATCHING_ARGUMENT_COUNT,
     MISMATCHING_ARGUMENT_TYPE
 )
-
-Generator<void> emit_compiler_error(CompilerError const& error, Token const& token, std::string const& message)
-{
-    hadAnError_g = true;
-
-    std::vector<std::string> lines {};
-
-    for (auto const& line : next_file_line(token.location.first))
-    {
-        lines.push_back(line.first);
-    }
-
-    switch (error)
-    {
-    case CompilerError::MISMATCHING_ARGUMENT_COUNT: {
-        {
-        auto& [data, type, location, depth] = token;
-        auto& [file, position] = location;
-        auto& [line, column] = position;
-
-        auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
-
-        std::cout << RED << "[error]" << RESET << ": mismatching argument count\n";
-        std::cout << '\n';
-        std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
-        std::cout << '\n';
-        std::cout << "    " << " | " << '\n';
-
-        auto index = beforeToken.find_first_not_of(' ');
-
-        if (index != std::string::npos)
-        {
-            beforeToken = beforeToken.substr(index);
-        }
-        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
-        {
-            beforeToken = "";
-        }
-
-        std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
-        std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << ' ' << message << '\n';
-        }
-        co_yield {};
-        {
-        auto& [data, type, location, depth] = token;
-        auto& [file, position] = location;
-        auto& [line, column] = position;
-
-        auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
-
-        std::cout << '\n';
-        std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
-        std::cout << '\n';
-        std::cout << "    " << " | " << '\n';
-
-        auto index = beforeToken.find_first_not_of(' ');
-
-        if (index != std::string::npos)
-        {
-            beforeToken = beforeToken.substr(index);
-        }
-        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
-        {
-            beforeToken = "";
-        }
-
-        std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
-        std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << ' ' << message << '\n';
-        }
-
-        break;
-    }
-    case CompilerError::MISMATCHING_ARGUMENT_TYPE: {
-        {
-        auto& [data, type, location, depth] = token;
-        auto& [file, position] = location;
-        auto& [line, column] = position;
-
-        auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
-
-        std::cout << RED << "[error]" << RESET << ": mismatching argument type\n";
-        std::cout << '\n';
-        std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
-        std::cout << '\n';
-        std::cout << "    " << " | " << '\n';
-
-        auto index = beforeToken.find_first_not_of(' ');
-
-        if (index != std::string::npos)
-        {
-            beforeToken = beforeToken.substr(index);
-        }
-        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
-        {
-            beforeToken = "";
-        }
-
-        std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
-        std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << ' ' << message << '\n';
-        }
-        co_yield {};
-        {
-        auto& [data, type, location, depth] = token;
-        auto& [file, position] = location;
-        auto& [line, column] = position;
-
-        auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
-
-        std::cout << '\n';
-        std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
-        std::cout << '\n';
-        std::cout << "    " << " | " << '\n';
-
-        auto index = beforeToken.find_first_not_of(' ');
-
-        if (index != std::string::npos)
-        {
-            beforeToken = beforeToken.substr(index);
-        }
-        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
-        {
-            beforeToken = "";
-        }
-
-        std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
-        std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << ' ' << message << '\n';
-        }
-
-        break;
-    }
-    }
-
-    co_return;
-}
-
-Generator<void> emit_compiler_warning(CompilerError const& error, Token const& token, std::string const& message)
-{
-    (void)error;
-    (void)token;
-    (void)message;
-    assert("UNIMPLEMENTED" && false);
-    co_return;
-}
 
 Result<std::string> compile_return(ReturnStmt*)
 {
@@ -1799,6 +1654,8 @@ Result<std::vector<uint32_t>> compile(std::unique_ptr<Node> const& ast)
 
     return program;
 }
+
+/* FIXME */
 
 Result<void> safe_main(std::span<char const*> arguments)
 {
