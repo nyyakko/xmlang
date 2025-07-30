@@ -7,12 +7,6 @@
 
 using namespace liberror;
 
-// cppcheck-suppress [unknownMacro]
-ENUM_CLASS(CompilerError,
-    MISMATCHING_ARGUMENT_COUNT,
-    MISMATCHING_ARGUMENT_TYPE
-)
-
 static Result<std::string> compile_return(ReturnStmt*)
 {
     return "0x05";
