@@ -1,14 +1,14 @@
 <program>
     <function name="main" result="none">
         <let name="numberA" type="number">42</let>
+        <let name="numberB" type="number">69</let>
+        <let name="numberC" type="number">81</let>
         <call who="println">
             <arg value="${numberA}"></arg>
         </call>
-        <let name="numberB" type="number">69</let>
         <call who="println">
             <arg value="${numberB}"></arg>
         </call>
-        <let name="numberC" type="number">81</let>
         <call who="println">
             <arg value="${numberC}"></arg>
         </call>
