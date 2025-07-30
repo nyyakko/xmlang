@@ -1,6 +1,6 @@
 # XMLang
 
-A (WIP) programming language based on xml.
+A (WIP) compiler for a programming language based on xml.
 
 <img width="25%" alt="image" src="https://github.com/user-attachments/assets/cfc61819-3101-4ce1-879f-f3627f88ddf5" />\
 
