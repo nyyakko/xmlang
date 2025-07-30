@@ -17,21 +17,18 @@ using namespace std::literals;
 
 static Generator<Token> next_token(std::string_view line)
 {
-    size_t depth = 0;
+    auto depth = 0zu;
 
     for (auto cursor = 0zu; cursor < line.size(); cursor += 1)
     {
-        size_t space = 0;
+        auto space = 0zu;
 
         while (cursor != line.size() && line.at(cursor) == ' ')
         {
             space += 1; cursor += 1;
         }
 
-        if (space % 4 == 0)
-        {
-            depth += space / 4;
-        }
+        if (space % 4 == 0) depth += space / 4;
 
         if (line.at(cursor) == '<')
         {
