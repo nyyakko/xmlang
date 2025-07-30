@@ -720,6 +720,18 @@ static Result<std::unique_ptr<Node>> parse_function(std::vector<Token> const& to
         break;
     }
 
+    auto maybeReturn = std::find_if(functionDecl->scope.begin(), functionDecl->scope.end(), [] (std::unique_ptr<Node> const& node) {
+        return
+            node->node_type() == Node::Type::STATEMENT &&
+            static_cast<Statement*>(node.get())->stmt_type() == Statement::Type::RETURN;
+    });
+
+    if (maybeReturn == functionDecl->scope.end())
+    {
+        auto returnStmt = std::make_unique<ReturnStmt>();
+        functionDecl->scope.push_back(std::move(returnStmt));
+    }
+
     TRY(parse_closing_tag(tokens, cursor, tag));
 
     return functionDecl;

@@ -50,7 +50,7 @@ static Result<std::string> compile_argument(std::vector<LetStmt*> const& variabl
         return {};
     }
 
-    auto variable = std::find_if(variables.begin(), variables.end(), [&] (LetStmt* node) {
+    auto variable = std::find_if(variables.begin(), variables.end(), [&] (LetStmt const* node) {
         return node->name == match.str(2);
     });
 
@@ -61,7 +61,7 @@ static Result<std::string> compile_argument(std::vector<LetStmt*> const& variabl
     return code;
 }
 
-static Result<std::string> compile_call(std::vector<LetStmt*> const& variables, CallStmt* callStmt)
+static Result<std::string> compile_call(std::vector<LetStmt*> const& variables, CallStmt const* callStmt)
 {
     std::string code {};
 
@@ -77,7 +77,7 @@ static Result<std::string> compile_call(std::vector<LetStmt*> const& variables, 
     return code;
 }
 
-static Result<std::string> compile_function(FunctionDecl* functionDecl)
+static Result<std::string> compile_function(FunctionDecl const* functionDecl)
 {
     std::string code {};
 
@@ -121,7 +121,7 @@ static Result<std::string> compile_function(FunctionDecl* functionDecl)
     return code;
 }
 
-static Result<std::string> compile_program(ProgramDecl* programDecl)
+static Result<std::string> compile_program(ProgramDecl const* programDecl)
 {
     std::string code {};
 
