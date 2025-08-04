@@ -1,0 +1,8 @@
+<program>
+    <function name="main" type="none">
+        <let name="message" type="string">Hello, World!</let>
+        <call who="println">
+            <arg value="${message}"></arg>
+        </call>
+    </function>
+</program>

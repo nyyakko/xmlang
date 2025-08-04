@@ -315,7 +315,8 @@ Result<std::string> compile_program(ProgramDecl const* declaration)
         }
     }
 
-    code += "\n\nENTRYPOINT\n\n";
+    if (!code.empty()) code += "\n\n";
+    code += "ENTRYPOINT\n\n";
 
     for (auto const& child : declaration->scope)
     {
