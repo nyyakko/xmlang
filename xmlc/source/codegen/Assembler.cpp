@@ -224,14 +224,7 @@ Result<std::vector<uint8_t>> assemble_code_segment(std::string_view code)
     {
         assert(header.starts_with("FUNCTION") || header.starts_with("ENTRYPOINT"));
 
-        if (header.starts_with("FUNCTION"))
-        {
-            codeSegmentOffsets_g.insert({ header.substr(header.find_first_of(' ')+1), bytes.size() });
-        }
-        else
-        {
-            codeSegmentOffsets_g.insert({ "ENTRYPOINT", bytes.size() });
-        }
+        codeSegmentOffsets_g.insert({ header.starts_with("FUNCTION") ? header.substr(header.find_first_of(' ')+1) : "ENTRYPOINT", bytes.size() });
 
         reader.next();
 
