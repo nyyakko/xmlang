@@ -1,7 +1,7 @@
 add_subdirectory(source)
 add_subdirectory(include/${PROJECT_NAME})
 
-add_executable(${PROJECT_NAME} "${xmlang_SourceFiles}")
+add_executable(${PROJECT_NAME} "${xmlc_SourceFiles}")
 
 if (ENABLE_CLANGTIDY)
     enable_clang_tidy(${PROJECT_NAME})
@@ -19,7 +19,7 @@ target_include_directories(${PROJECT_NAME}
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 
 
-target_link_options(${PROJECT_NAME} PRIVATE ${xmlang_LinkerOptions})
-target_compile_options(${PROJECT_NAME} PRIVATE ${xmlang_CompilerOptions})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${xmlang_ExternalLibraries})
+target_link_options(${PROJECT_NAME} PRIVATE ${xmlc_LinkerOptions})
+target_compile_options(${PROJECT_NAME} PRIVATE ${xmlc_CompilerOptions})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${xmlc_ExternalLibraries})
 

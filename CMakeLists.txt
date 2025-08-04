@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(xmlang LANGUAGES CXX)
+project(xmlc LANGUAGES CXX)
 
 include(cmake/get_cpm.cmake)
 
@@ -13,10 +13,10 @@ CPMAddPackage(URI "gh:nyyakko/argparse#master"       EXCLUDE_FROM_ALL YES)
 
 include(cmake/static_analyzers.cmake)
 
-set(xmlang_CompilerOptions ${xmlang_CompilerOptions} -Wno-gnu-statement-expression-from-macro-expansion)
-set(xmlang_LinkerOptions ${xmlang_LinkerOptions})
+set(xmlc_CompilerOptions ${xmlc_CompilerOptions} -Wno-gnu-statement-expression-from-macro-expansion)
+set(xmlc_LinkerOptions ${xmlc_LinkerOptions})
 
-set(xmlang_ExternalLibraries
+set(xmlc_ExternalLibraries
     LibError::LibError
     LibEnum::LibEnum
     LibCoro::LibCoro
@@ -25,5 +25,5 @@ set(xmlang_ExternalLibraries
     fmt::fmt
 )
 
-add_subdirectory(xmlang)
+add_subdirectory(xmlc)
 

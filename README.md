@@ -1,4 +1,4 @@
-# XMLang
+# xmlc
 
 A (WIP) compiler for a programming language based on xml.
 

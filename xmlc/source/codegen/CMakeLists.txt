@@ -1,6 +1,6 @@
 set(DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-set(xmlang_SourceFiles ${xmlang_SourceFiles}
+set(xmlc_SourceFiles ${xmlc_SourceFiles}
     "${DIR}/Assembler.cpp"
     "${DIR}/Compiler.cpp"
 
