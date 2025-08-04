@@ -4,14 +4,13 @@
 #include <libenum/Enum.hpp>
 #include <liberror/Try.hpp>
 
-#include <regex>
 #include <algorithm>
+#include <cstring>
 #include <functional>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <cstring>
-#include <fstream>
 
 using namespace liberror;
 using namespace libcoro;
@@ -246,7 +245,7 @@ Result<std::vector<uint8_t>> assemble_code_segment(std::string_view code)
     return bytes;
 }
 
-Result<void> assemble(std::string_view code)
+Result<std::vector<uint8_t>> assemble(std::string_view code)
 {
     std::vector<uint8_t> program {};
 
@@ -268,8 +267,5 @@ Result<void> assemble(std::string_view code)
     std::ranges::copy(dataSegmentBytes, std::back_inserter(program));
     std::ranges::copy(codeSegmentBytes, std::back_inserter(program));
 
-    std::ofstream stream("Program.lmx", std::ios::binary);
-    stream.write(reinterpret_cast<char const*>(program.data()), static_cast<int>(program.size()));
-
-    return {};
+    return program;
 }

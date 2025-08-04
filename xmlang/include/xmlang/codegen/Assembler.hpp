@@ -4,4 +4,4 @@
 
 #include <liberror/Result.hpp>
 
-liberror::Result<void> assemble(std::string_view code);
+liberror::Result<std::vector<uint8_t>> assemble(std::string_view code);
