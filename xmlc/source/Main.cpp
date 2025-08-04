@@ -5,7 +5,6 @@
 
 #include <argparse/argparse.hpp>
 #include <fmt/format.h>
-#include <libenum/Enum.hpp>
 #include <liberror/Result.hpp>
 #include <liberror/Try.hpp>
 

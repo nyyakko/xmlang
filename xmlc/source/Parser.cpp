@@ -1,5 +1,6 @@
 #include "Parser.hpp"
 
+#include <magic_enum/magic_enum.hpp>
 #include <libcoro/Generator.hpp>
 #include <liberror/Result.hpp>
 #include <liberror/Try.hpp>
@@ -16,15 +17,15 @@ auto static constexpr BLUE = "\033[34m";
 auto static constexpr YELLOW = "\033[33m";
 auto static constexpr RESET = "\033[00m";
 
-// cppcheck-suppress [unknownMacro]
-ENUM_CLASS(ParserError,
+enum class ParserError
+{
     UNEXPECTED_TOKEN_REACHED,
     EXPECTED_TOKEN_MISSING,
     ENCLOSING_TOKEN_MISSING,
     ENCLOSING_TOKEN_MISMATCH,
     UNEXPECTED_END_OF_FILE,
     MISSING_RETURN_STATEMENT,
-);
+};
 
 static auto hadAnError_g = false;
 
@@ -48,6 +49,7 @@ static void emit_parser_error(ParserError const& error, std::vector<std::pair<To
 
     for (auto const& line : next_line(issues.at(0).first.location.first))
     {
+        // cppcheck-suppress [useStlAlgorithm]
         lines.push_back(line);
     }
 
@@ -60,6 +62,7 @@ static void emit_parser_error(ParserError const& error, std::vector<std::pair<To
     case ParserError::ENCLOSING_TOKEN_MISSING: { std::cout << " missing enclosing token"; break; }
     case ParserError::ENCLOSING_TOKEN_MISMATCH: { std::cout << "mismatching tokens found"; break; }
     case ParserError::MISSING_RETURN_STATEMENT: { std::cout << "missing return statement"; break; }
+    case ParserError::UNEXPECTED_END_OF_FILE: { std::cout << "unexpected end of file"; break; }
     }
 
     std::cout << '\n';
@@ -95,10 +98,10 @@ static void emit_parser_error(ParserError const& error, std::vector<std::pair<To
     std::cout << '\n';
 }
 
-// cppcheck-suppress [unknownMacro]
-ENUM_CLASS(ParserWarning,
+enum class ParserWarning
+{
     UNEXPECTED_TOKEN_POSITION
-);
+};
 
 static void emit_parser_warning(ParserWarning const& warning, std::vector<std::pair<Token, std::string_view>> const& issues)
 {
@@ -106,6 +109,7 @@ static void emit_parser_warning(ParserWarning const& warning, std::vector<std::p
 
     for (auto const& line : next_line(issues.at(0).first.location.first))
     {
+        // cppcheck-suppress [useStlAlgorithm]
         lines.push_back(line);
     }
 
@@ -202,7 +206,7 @@ static Result<Token> advance(std::vector<Token> const& tokens, int& cursor, Toke
     return make_error({});
 }
 
-static bool is_next_statement(std::vector<Token> const& tokens, int& cursor)
+static bool is_next_statement(std::vector<Token> const& tokens, int cursor)
 {
     return
         peek(tokens, cursor, 1).data == "let" ||
@@ -212,7 +216,7 @@ static bool is_next_statement(std::vector<Token> const& tokens, int& cursor)
         ;
 }
 
-static bool is_next_declaration(std::vector<Token> const& tokens, int& cursor)
+static bool is_next_declaration(std::vector<Token> const& tokens, int cursor)
 {
     return
         peek(tokens, cursor, 1).data == "function"
@@ -795,7 +799,7 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 auto callStmt = static_cast<CallStmt*>(statement);
 
                 ast = {{
-                    callStmt->stmt_type(), {
+                    magic_enum::enum_name(callStmt->stmt_type()), {
                         { "who", callStmt->who },
                         { "arguments", nlohmann::json::array() }
                     }
@@ -803,7 +807,7 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
 
                 for (auto const& child : callStmt->arguments)
                 {
-                    ast[callStmt->stmt_type().to_string()]["arguments"].push_back(dump_ast(child));
+                    ast[magic_enum::enum_name(callStmt->stmt_type())]["arguments"].push_back(dump_ast(child));
                 }
 
                 break;
@@ -812,7 +816,7 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 auto argumentStmt = static_cast<ArgStmt*>(statement);
 
                 ast = {{
-                    argumentStmt->stmt_type(), {
+                    magic_enum::enum_name(argumentStmt->stmt_type()), {
                         { "value", dump_ast(argumentStmt->value) },
                     }
                 }};
@@ -823,7 +827,7 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 auto returnStmt = static_cast<RetStmt*>(statement);
 
                 ast = {{
-                    returnStmt->stmt_type(), {
+                    magic_enum::enum_name(returnStmt->stmt_type()), {
                         { "type", returnStmt->type },
                         { "value", returnStmt->value ? dump_ast(returnStmt->value) : "none" },
                     }
@@ -835,7 +839,7 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 auto letStmt = static_cast<LetStmt*>(statement);
 
                 ast = {{
-                    letStmt->stmt_type(), {
+                    magic_enum::enum_name(letStmt->stmt_type()), {
                         { "name", letStmt->name },
                         { "type", letStmt->type },
                         { "value", dump_ast(letStmt->value) },
@@ -848,7 +852,7 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 auto ifStmt = static_cast<IfStmt*>(statement);
 
                 ast = {{
-                    ifStmt->stmt_type(), {
+                    magic_enum::enum_name(ifStmt->stmt_type()), {
                         { "condition", dump_ast(ifStmt->condition) },
                         { "trueBranch", nlohmann::json::array() },
                         { "falseBranch", nlohmann::json::array() },
@@ -857,12 +861,12 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
 
                 for (auto const& child : ifStmt->trueBranch)
                 {
-                    ast[ifStmt->stmt_type().to_string()]["trueBranch"].push_back(dump_ast(child));
+                    ast[magic_enum::enum_name(ifStmt->stmt_type())]["trueBranch"].push_back(dump_ast(child));
                 }
 
                 for (auto const& child : ifStmt->falseBranch)
                 {
-                    ast[ifStmt->stmt_type().to_string()]["falseBranch"].push_back(dump_ast(child));
+                    ast[magic_enum::enum_name(ifStmt->stmt_type())]["falseBranch"].push_back(dump_ast(child));
                 }
 
                 break;
@@ -880,14 +884,14 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 auto programDecl = static_cast<Declaration*>(declaration);
 
                 ast = {{
-                    programDecl->decl_type(), {
+                    magic_enum::enum_name(programDecl->decl_type()), {
                         { "scope", nlohmann::json::array() }
                     }
                 }};
 
                 for (auto const& child : programDecl->scope)
                 {
-                    ast[programDecl->decl_type().to_string()]["scope"].push_back(dump_ast(child));
+                    ast[magic_enum::enum_name(programDecl->decl_type())]["scope"].push_back(dump_ast(child));
                 }
 
                 break;
@@ -896,7 +900,7 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 auto functionDecl = static_cast<FunctionDecl*>(declaration);
 
                 ast = {{
-                    functionDecl->decl_type(), {
+                    magic_enum::enum_name(functionDecl->decl_type()), {
                         { "name", functionDecl->name },
                         { "type", functionDecl->type },
                         { "parameters", nlohmann::json::array() },
@@ -906,12 +910,12 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
 
                 for (auto const& parameter : functionDecl->parameters)
                 {
-                    ast[functionDecl->decl_type().to_string()]["parameters"].push_back({ { "name", parameter.first }, { "type", parameter.second } });
+                    ast[magic_enum::enum_name(functionDecl->decl_type())]["parameters"].push_back({ { "name", parameter.first }, { "type", parameter.second } });
                 }
 
                 for (auto const& child : declaration->scope)
                 {
-                    ast[functionDecl->decl_type().to_string()]["scope"].push_back(dump_ast(child));
+                    ast[magic_enum::enum_name(functionDecl->decl_type())]["scope"].push_back(dump_ast(child));
                 }
 
                 break;
@@ -929,7 +933,7 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 auto literalExpr = static_cast<LiteralExpr*>(expression);
 
                 ast = {{
-                    literalExpr->expr_type(), {
+                    magic_enum::enum_name(literalExpr->expr_type()), {
                         { "value", literalExpr->value }
                     }
                 }};

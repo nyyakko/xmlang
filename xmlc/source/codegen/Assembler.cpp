@@ -1,7 +1,7 @@
 #include "codegen/Assembler.hpp"
 
+#include <magic_enum/magic_enum.hpp>
 #include <libcoro/Generator.hpp>
-#include <libenum/Enum.hpp>
 #include <liberror/Try.hpp>
 
 #include <algorithm>
@@ -15,17 +15,18 @@
 using namespace liberror;
 using namespace libcoro;
 
-ENUM_CLASS(Instruction,
+enum class Instruction
+{
     PUSHA,
     PUSHB,
     POP,
     CALLA,
     CALLB,
     RET
-);
+};
 
-ENUM_CLASS(Intrinsic, PRINT, PRINTLN, FORMAT);
-ENUM_CLASS(Section, ARGUMENT, SCOPE, DATA);
+enum class Intrinsic { PRINT, PRINTLN, FORMAT };
+enum class Section { ARGUMENT, SCOPE, DATA };
 
 static std::map<std::string, int32_t> codeSegmentOffsets_g;
 
@@ -111,10 +112,12 @@ std::array<uint8_t, 3> assemble_push_a(std::string const& code)
     std::string segment;
     std::stringstream(code) >> value >> segment;
 
+    assert(magic_enum::enum_contains<Section>(segment));
+
     return {
-        Instruction::PUSHA,
+        static_cast<uint8_t>(Instruction::PUSHA),
         static_cast<uint8_t>(value),
-        static_cast<uint8_t>(Section::from_string(segment)),
+        static_cast<uint8_t>(*magic_enum::enum_cast<Section>(segment)),
     };
 
 }
@@ -128,11 +131,14 @@ std::array<uint8_t, 4> assemble_push_b(std::string const& code)
     int offset;
     std::stringstream(match.str(3)) >> offset;
 
+    assert(magic_enum::enum_contains<Section>(match.str(2)));
+    assert(magic_enum::enum_contains<Section>(match.str(4)));
+
     return {
-        Instruction::PUSHB,
-        static_cast<uint8_t>(Section::from_string(match.str(2))),
+        static_cast<uint8_t>(Instruction::PUSHB),
+        static_cast<uint8_t>(*magic_enum::enum_cast<Section>(match.str(2))),
         static_cast<uint8_t>(offset),
-        static_cast<uint8_t>(Section::from_string(match.str(4)))
+        static_cast<uint8_t>(*magic_enum::enum_cast<Section>(match.str(4)))
     };
 }
 
@@ -142,7 +148,7 @@ std::array<uint8_t, 2> assemble_call_a(std::string const& code)
     std::stringstream(code) >> value;
 
     return {
-        Instruction::CALLA,
+        static_cast<uint8_t>(Instruction::CALLA),
         static_cast<uint8_t>(codeSegmentOffsets_g.at(value))
     };
 }
@@ -151,19 +157,26 @@ std::array<uint8_t, 2> assemble_call_b(std::string code)
 {
     std::transform(code.begin(), code.end(), code.begin(), ::toupper);
 
+    assert(magic_enum::enum_contains<Intrinsic>(code));
+
     return {
-        Instruction::CALLB,
-        static_cast<uint8_t>(Intrinsic::from_string(code))
+        static_cast<uint8_t>(Instruction::CALLB),
+        static_cast<uint8_t>(*magic_enum::enum_cast<Intrinsic>(code))
     };
 }
 
-std::array<uint8_t, 1> assemble_ret() { return { Instruction::RET }; }
+std::array<uint8_t, 1> assemble_ret()
+{
+    return {
+        static_cast<uint8_t>(Instruction::RET)
+    };
+}
 
 std::array<uint8_t, 2> assemble_pop(std::string const& code)
 {
     return {
-        Instruction::POP,
-        static_cast<uint8_t>(Section::from_string(code))
+        static_cast<uint8_t>(Instruction::POP),
+        static_cast<uint8_t>(*magic_enum::enum_cast<Intrinsic>(code))
     };
 }
 

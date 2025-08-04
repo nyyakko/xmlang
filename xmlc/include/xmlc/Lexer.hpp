@@ -1,6 +1,6 @@
 #pragma once
 
-#include <libenum/Enum.hpp>
+#include <magic_enum/magic_enum.hpp>
 #include <liberror/Result.hpp>
 #include <nlohmann/json.hpp>
 
@@ -24,7 +24,8 @@ using Location = std::pair<std::filesystem::path, std::pair<size_t, size_t>>;
 struct Token
 {
     // cppcheck-suppress [unknownMacro]
-    ENUM_CLASS(Type,
+    enum class Type
+    {
         LEFT_ANGLE,
         RIGHT_ANGLE,
         DOUBLE_QUOTE,
@@ -35,7 +36,7 @@ struct Token
         LITERAL,
         PROPERTY,
         END_OF_FILE
-    )
+    };
 
     std::string data;
     Type type;

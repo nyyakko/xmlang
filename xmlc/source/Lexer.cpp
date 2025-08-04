@@ -217,7 +217,7 @@ nlohmann::ordered_json dump_tokens(std::vector<Token> const& tokens)
     {
         nlohmann::ordered_json json {
             { "data", token.data },
-            { "type", token.type.to_string() },
+            { "type", magic_enum::enum_name(token.type) },
             {
                 "location", {
                     { "file", token.location.first },

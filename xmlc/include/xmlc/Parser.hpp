@@ -2,7 +2,6 @@
 
 #include "Lexer.hpp"
 
-#include <libenum/Enum.hpp>
 #include <liberror/Result.hpp>
 
 #include <vector>
@@ -15,7 +14,7 @@ constexpr virtual Node::Type node_type() const override { return TYPE; } \
 struct Node
 {
     // cppcheck-suppress [unknownMacro]
-    ENUM_CLASS(Type, DECLARATION, EXPRESSION, STATEMENT)
+    enum class Type { DECLARATION, EXPRESSION, STATEMENT };
 
     virtual ~Node() = default;
 
@@ -29,7 +28,7 @@ struct Declaration : public Node
     NODE_TYPE(Node::Type::DECLARATION);
 
     // cppcheck-suppress [unknownMacro]
-    ENUM_CLASS(Type, FUNCTION, PROGRAM)
+    enum class Type { FUNCTION, PROGRAM };
 
     constexpr virtual Type decl_type() const = 0;
 
@@ -60,11 +59,7 @@ struct Expression : public Node
 {
     NODE_TYPE(Node::Type::EXPRESSION)
 
-    ENUM_CLASS(Type,
-        LITERAL,
-        LOGICAL,
-        ARITHMETIC
-    )
+    enum class Type { LITERAL, LOGICAL, ARITHMETIC };
 
     constexpr virtual Type expr_type() const = 0;
 };
@@ -98,13 +93,14 @@ struct Statement : public Node
     NODE_TYPE(Node::Type::STATEMENT);
 
     // cppcheck-suppress [unknownMacro]
-    ENUM_CLASS(Type,
+    enum class Type
+    {
         ARG,
         CALL,
         IF,
         LET,
         RETURN,
-    )
+    };
 
     constexpr virtual Type stmt_type() const = 0;
 };

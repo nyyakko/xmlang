@@ -8,7 +8,7 @@ using namespace liberror;
 
 static std::map<std::string, int32_t> dataSegmentOffsets_g;
 
-Result<std::string> collect_data_segment(std::unique_ptr<Node> const& node)
+Result<std::string> generate_data_segment(std::unique_ptr<Node> const& node)
 {
     std::string code;
 
@@ -22,7 +22,7 @@ Result<std::string> collect_data_segment(std::unique_ptr<Node> const& node)
         switch (statement->stmt_type())
         {
         case Statement::Type::ARG: {
-            auto value = TRY(collect_data_segment(static_cast<ArgStmt const*>(statement)->value));
+            auto value = TRY(generate_data_segment(static_cast<ArgStmt const*>(statement)->value));
 
             if (!(std::all_of(value.begin(), value.end(), ::isdigit) || (value.starts_with("${") && value.ends_with('}'))))
             {
@@ -48,7 +48,7 @@ Result<std::string> collect_data_segment(std::unique_ptr<Node> const& node)
         case Statement::Type::CALL: {
             for (std::string_view prefix = ""; auto const& child : static_cast<CallStmt const*>(statement)->arguments)
             {
-                auto value = TRY(collect_data_segment(child));
+                auto value = TRY(generate_data_segment(child));
                 if (value.empty()) continue;
                 code += prefix;
                 code += value;
@@ -59,7 +59,7 @@ Result<std::string> collect_data_segment(std::unique_ptr<Node> const& node)
         }
         case Statement::Type::LET: {
             auto letStmt = static_cast<LetStmt const*>(statement);
-            auto value = TRY(collect_data_segment(letStmt->value));
+            auto value = TRY(generate_data_segment(letStmt->value));
 
             if (letStmt->type == "string")
             {
@@ -74,7 +74,7 @@ Result<std::string> collect_data_segment(std::unique_ptr<Node> const& node)
             auto retStmt = static_cast<RetStmt const*>(statement);
             if (retStmt->type == "none") return {};
 
-            auto value = TRY(collect_data_segment(retStmt->value));
+            auto value = TRY(generate_data_segment(retStmt->value));
 
             if (retStmt->type == "string")
             {
@@ -109,7 +109,7 @@ Result<std::string> collect_data_segment(std::unique_ptr<Node> const& node)
 
         for (std::string_view prefix; auto const& child : declaration->scope)
         {
-            auto value = TRY(collect_data_segment(child));
+            auto value = TRY(generate_data_segment(child));
             if (value.empty()) continue;
             code += prefix;
             code += value;
@@ -278,7 +278,7 @@ Result<std::string> compile_declaration(Declaration const* declaration);
 
 Result<std::string> compile_function(FunctionDecl const* declaration)
 {
-    std::string code = fmt::format("FUNCTION {}\n\n", declaration->name);
+    std::string code = fmt::format("FUNCTION {}:\n\n", declaration->name);
 
     // cppcheck-suppress [variableScope]
     for (std::string_view separator = ""; auto const& child : declaration->scope)
@@ -335,7 +335,7 @@ Result<std::string> compile_program(ProgramDecl const* declaration)
 Result<std::string> compile(std::unique_ptr<Node> const& ast)
 {
     std::string dataSegment = ".DATA\n\n";
-    dataSegment += TRY(collect_data_segment(ast));
+    dataSegment += TRY(generate_data_segment(ast));
 
     std::string codeSegment = "\n\n.CODE\n\n";
     codeSegment += TRY(compile_program(static_cast<ProgramDecl const*>(ast.get())));

@@ -6,6 +6,7 @@ include(cmake/get_cpm.cmake)
 
 CPMAddPackage(URI "gh:nyyakko/LibError#master"       EXCLUDE_FROM_ALL YES)
 CPMAddPackage(URI "gh:nyyakko/LibEnum#master"        EXCLUDE_FROM_ALL YES)
+CPMAddPackage(URI "gh:Neargye/magic_enum@0.9.7"      EXCLUDE_FROM_ALL YES)
 CPMAddPackage(URI "gh:nyyakko/LibCoro#master"        EXCLUDE_FROM_ALL YES)
 CPMAddPackage(URI "gh:fmtlib/fmt#10.2.1"             EXCLUDE_FROM_ALL YES)
 CPMAddPackage(URI "gh:nlohmann/json@3.12.0"          EXCLUDE_FROM_ALL YES)
@@ -18,7 +19,7 @@ set(xmlc_LinkerOptions ${xmlc_LinkerOptions})
 
 set(xmlc_ExternalLibraries
     LibError::LibError
-    LibEnum::LibEnum
+    magic_enum::magic_enum
     LibCoro::LibCoro
     nlohmann_json::nlohmann_json
     argparse::argparse
