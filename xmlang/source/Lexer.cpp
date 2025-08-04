@@ -76,9 +76,9 @@ static Generator<Token> next_token(std::string_view line)
         }
         else if (line.at(cursor) == '"')
         {
-            co_yield Token { .data = { line.at(cursor) }, .type = Token::Type::QUOTE, .location = { {}, { {}, cursor } }, .depth = depth  };
+            co_yield Token { .data = { line.at(cursor) }, .type = Token::Type::DOUBLE_QUOTE, .location = { {}, { {}, cursor } }, .depth = depth  };
 
-            if (!(cursor < line.size() && (std::isalpha(line.at(cursor+1)) || line.at(cursor+1) == '$' || line.at(cursor+1) == '{' || line.at(cursor+1) == '}')))
+            if (!(cursor < line.size() && ((std::isalpha(line.at(cursor+1)) || std::isdigit(line.at(cursor+1))) || line.at(cursor+1) == '$' || line.at(cursor+1) == '{' || line.at(cursor+1) == '}')))
             {
                 continue;
             }
@@ -103,6 +103,36 @@ static Generator<Token> next_token(std::string_view line)
 
             co_yield Token { .data = data, .type = Token::Type::LITERAL, .location = { {}, { {}, cursor } }, .depth = depth  };
         }
+        else if (line.at(cursor) == '\'')
+        {
+            co_yield Token { .data = { line.at(cursor) }, .type = Token::Type::SINGLE_QUOTE, .location = { {}, { {}, cursor } }, .depth = depth  };
+
+            if (!(cursor < line.size() && ((std::isalpha(line.at(cursor+1)) || std::isdigit(line.at(cursor+1))) || line.at(cursor+1) == '$' || line.at(cursor+1) == '{' || line.at(cursor+1) == '}')))
+            {
+                continue;
+            }
+
+            cursor++;
+
+            std::string data;
+
+            while (cursor < line.size())
+            {
+                data += line.at(cursor);
+
+                if (cursor+1 >= line.size()) break;
+
+                if (line.at(cursor+1) == '\'')
+                {
+                    break;
+                }
+
+                cursor++;
+            }
+
+            co_yield Token { .data = data, .type = Token::Type::LITERAL, .location = { {}, { {}, cursor } }, .depth = depth  };
+
+        }
         else
         {
             std::string data;
@@ -115,7 +145,7 @@ static Generator<Token> next_token(std::string_view line)
 
                 if (line.at(cursor+1) == ' ' || line.at(cursor+1) == '=' ||
                     line.at(cursor+1) == '<' || line.at(cursor+1) == '>' ||
-                    line.at(cursor+1) == '"')
+                    line.at(cursor+1) == '"' || line.at(cursor+1) == '\'')
                 {
                     break;
                 }
@@ -129,7 +159,7 @@ static Generator<Token> next_token(std::string_view line)
             }
             else
             {
-                co_yield Token { .data = data, .type = Token::Type::IDENTIFIER, .location = { {}, { {}, cursor } }, .depth = depth };
+                co_yield Token { .data = data, .type = Token::Type::PROPERTY, .location = { {}, { {}, cursor } }, .depth = depth };
             }
         }
     }

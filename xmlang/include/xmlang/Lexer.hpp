@@ -15,10 +15,8 @@ inline std::array KEYWORDS {
     "let",
     "program",
     "return",
-    "class",
-    "new",
-    "ctor",
-    "dtor",
+    "if",
+    "else",
 };
 
 using Location = std::pair<std::filesystem::path, std::pair<size_t, size_t>>;
@@ -29,12 +27,13 @@ struct Token
     ENUM_CLASS(Type,
         LEFT_ANGLE,
         RIGHT_ANGLE,
-        QUOTE,
+        DOUBLE_QUOTE,
+        SINGLE_QUOTE,
         SLASH,
         EQUAL,
         KEYWORD,
         LITERAL,
-        IDENTIFIER,
+        PROPERTY,
         END_OF_FILE
     )
 

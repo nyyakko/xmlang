@@ -15,8 +15,9 @@ constexpr virtual Node::Type node_type() const override { return TYPE; } \
 struct Node
 {
     // cppcheck-suppress [unknownMacro]
-    ENUM_CLASS(Type, STATEMENT, DECLARATION)
-virtual ~Node() = default;
+    ENUM_CLASS(Type, DECLARATION, EXPRESSION, STATEMENT)
+
+    virtual ~Node() = default;
 
     constexpr virtual Type node_type() const = 0;
 
@@ -28,7 +29,7 @@ struct Declaration : public Node
     NODE_TYPE(Node::Type::DECLARATION);
 
     // cppcheck-suppress [unknownMacro]
-    ENUM_CLASS(Type, FUNCTION, PROGRAM, CLASS)
+    ENUM_CLASS(Type, FUNCTION, PROGRAM)
 
     constexpr virtual Type decl_type() const = 0;
 
@@ -43,21 +44,50 @@ struct ProgramDecl : public Declaration
     DECL_TYPE(Declaration::Type::PROGRAM);
 };
 
-struct ClassDecl : public Declaration
-{
-    DECL_TYPE(Declaration::Type::CLASS);
-
-    std::string name {};
-    std::vector<std::string> inherits {};
-};
-
 struct FunctionDecl : public Declaration
 {
     DECL_TYPE(Declaration::Type::FUNCTION);
 
-    std::string result {};
+    std::string type {};
     std::vector<std::pair<std::string, std::string>> parameters {};
     std::string name {};
+};
+
+#define EXPR_TYPE(TYPE)                                                        \
+constexpr virtual Expression::Type expr_type() const override { return TYPE; } \
+
+struct Expression : public Node
+{
+    NODE_TYPE(Node::Type::EXPRESSION)
+
+    ENUM_CLASS(Type,
+        LITERAL,
+        LOGICAL,
+        ARITHMETIC
+    )
+
+    constexpr virtual Type expr_type() const = 0;
+};
+
+struct LogicalExpr : public Expression
+{
+    EXPR_TYPE(Expression::Type::LOGICAL)
+
+    std::unique_ptr<Node> value;
+};
+
+struct ArithmeticExpr : public Expression
+{
+    EXPR_TYPE(Expression::Type::ARITHMETIC)
+
+    std::unique_ptr<Node> value;
+};
+
+struct LiteralExpr : public Expression
+{
+    EXPR_TYPE(Expression::Type::LITERAL)
+
+    std::string value;
 };
 
 #define STMT_TYPE(TYPE)                                                       \
@@ -69,9 +99,9 @@ struct Statement : public Node
 
     // cppcheck-suppress [unknownMacro]
     ENUM_CLASS(Type,
-        ARGUMENT,
+        ARG,
         CALL,
-        EXPRESSION,
+        IF,
         LET,
         RETURN,
     )
@@ -87,17 +117,18 @@ struct CallStmt : public Statement
     std::string who {};
 };
 
-struct ArgumentStmt : public Statement
+struct ArgStmt : public Statement
 {
-    STMT_TYPE(Statement::Type::ARGUMENT);
+    STMT_TYPE(Statement::Type::ARG);
 
     std::unique_ptr<Node> value {};
 };
 
-struct ReturnStmt : public Statement
+struct RetStmt : public Statement
 {
     STMT_TYPE(Statement::Type::RETURN);
 
+    std::string type;
     std::unique_ptr<Node> value {};
 };
 
@@ -110,25 +141,13 @@ struct LetStmt : public Statement
     std::unique_ptr<Node> value {};
 };
 
-#define EXPR_TYPE(TYPE)                                                        \
-constexpr virtual Expression::Type expr_type() const override { return TYPE; } \
-
-struct Expression : public Statement
+struct IfStmt : public Statement
 {
-    STMT_TYPE(Statement::Type::EXPRESSION);
+    STMT_TYPE(Statement::Type::IF);
 
-    ENUM_CLASS(Type,
-        LITERAL,
-    )
-
-    constexpr virtual Type expr_type() const = 0;
-};
-
-struct LiteralExpr : public Expression
-{
-    EXPR_TYPE(Expression::Type::LITERAL)
-
-    std::string value;
+    std::unique_ptr<Node> condition;
+    std::vector<std::unique_ptr<Node>> trueBranch {};
+    std::vector<std::unique_ptr<Node>> falseBranch {};
 };
 
 liberror::Result<std::unique_ptr<Node>> parse(std::vector<Token> const& tokens);

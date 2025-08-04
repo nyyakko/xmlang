@@ -1,4 +1,5 @@
-#include "Compiler.hpp"
+#include "codegen/Assembler.hpp"
+#include "codegen/Compiler.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
 
@@ -14,23 +15,32 @@ using namespace liberror;
 
 Result<void> safe_main(std::span<char const*> arguments)
 {
-    argparse::ArgumentParser args("xmlang", "", argparse::default_arguments::help);
-    args.add_description("xmlang compiler");
+    argparse::ArgumentParser cli("xmlang", "", argparse::default_arguments::help);
+    cli.add_description("xmlang compiler");
 
-    args.add_argument("-f", "--file").help("file to be compiled").required();
-    args.add_argument("-d", "--dump").choices("ast", "tokens").help("dumps the given xmlang source");
-    args.add_argument("--arch").choices("lmx").help("compilation target architecture");
+    cli.add_argument("-f", "--file").help("file to be compiled").required();
+
+    argparse::ArgumentParser dump("dump", "", argparse::default_arguments::help);
+    dump.add_description("dumps the result of a module to the standard output");
+
+    auto& group = dump.add_mutually_exclusive_group(true);
+
+    group.add_argument("-t", "--tokens").flag();
+    group.add_argument("-a", "--ast").flag();
+    group.add_argument("-s", "--asm").flag();
+
+    cli.add_subparser(dump);
 
     try
     {
-        args.parse_args(static_cast<int>(arguments.size()), arguments.data());
+        cli.parse_args(static_cast<int>(arguments.size()), arguments.data());
     }
     catch (std::exception const& exception)
     {
         return liberror::make_error(exception.what());
     }
 
-    auto source = args.get<std::string>("--file");
+    auto source = cli.get<std::string>("--file");
 
     if (!std::filesystem::exists(source))
     {
@@ -39,28 +49,29 @@ Result<void> safe_main(std::span<char const*> arguments)
 
     auto tokens = tokenize(source);
 
-    if (args.has_value("--dump") && args.get<std::string>("--dump") == "tokens")
+    if (dump["--tokens"] != false)
     {
-        std::cout << std::setw(4) << dump_tokens(tokens);
+        std::cout << std::setw(4) << dump_tokens(tokens) << '\n';
         return {};
     }
 
     auto ast = TRY(parse(tokens));
 
-    if (args.has_value("--dump") && args.get<std::string>("--dump") == "ast")
+    if (dump["--ast"] != false)
     {
         std::cout << std::setw(4) << dump_ast(ast) << '\n';
         return {};
     }
 
-    if (args.has_value("--arch"))
+    auto assembly = TRY(compile(ast));
+
+    if (dump["--asm"] != false)
     {
-        TRY(compile(ast, args.get<std::string>("--arch")));
+        std::cout << assembly << '\n';
+        return {};
     }
-    else
-    {
-        TRY(compile(ast));
-    }
+
+    TRY(assemble(assembly));
 
     return {};
 }

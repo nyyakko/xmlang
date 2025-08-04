@@ -1,0 +1,7 @@
+<program>
+    <function name="main" type="none">
+        <call who="println">
+            <arg value="Hello, World!"></arg>
+        </call>
+    </function>
+</program>

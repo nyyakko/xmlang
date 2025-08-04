@@ -14,7 +14,7 @@ CPMAddPackage(URI "gh:nyyakko/argparse#master"       EXCLUDE_FROM_ALL YES)
 include(cmake/static_analyzers.cmake)
 
 set(xmlang_CompilerOptions ${xmlang_CompilerOptions} -Wno-gnu-statement-expression-from-macro-expansion)
-# set(xmlang_LinkerOptions ${xmlang_LinkerOptions})
+set(xmlang_LinkerOptions ${xmlang_LinkerOptions})
 
 set(xmlang_ExternalLibraries
     LibError::LibError

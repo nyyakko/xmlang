@@ -1,6 +1,7 @@
 #include "Parser.hpp"
 
 #include <libcoro/Generator.hpp>
+#include <liberror/Result.hpp>
 #include <liberror/Try.hpp>
 
 #include <iostream>
@@ -21,10 +22,11 @@ ENUM_CLASS(ParserError,
     EXPECTED_TOKEN_MISSING,
     ENCLOSING_TOKEN_MISSING,
     ENCLOSING_TOKEN_MISMATCH,
-    UNEXPECTED_END_OF_FILE
-)
+    UNEXPECTED_END_OF_FILE,
+    MISSING_RETURN_STATEMENT,
+);
 
-auto hadAnError_g = false;
+static auto hadAnError_g = false;
 
 static Generator<std::string> next_line(std::filesystem::path const& path)
 {
@@ -38,194 +40,86 @@ static Generator<std::string> next_line(std::filesystem::path const& path)
     co_return;
 }
 
-static Generator<void> emit_parser_error(ParserError const& error, Token const& token, std::string const& message)
+static void emit_parser_error(ParserError const& error, std::vector<std::pair<Token, std::string_view>> const& issues)
 {
     hadAnError_g = true;
 
     std::vector<std::string> lines {};
 
-    for (auto const& line : next_line(token.location.first))
+    for (auto const& line : next_line(issues.at(0).first.location.first))
     {
         lines.push_back(line);
     }
 
+    std::cout << RED << "[error]: " << RESET;
+
     switch (error)
     {
-    case ParserError::UNEXPECTED_TOKEN_REACHED: {
-        auto& [data, type, location, depth] = token;
-        auto& [file, position] = location;
-        auto& [line, column] = position;
-
-        auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
-
-        std::cout << RED << "[error]" << RESET << ": unexpected token\n";
-        std::cout << '\n';
-        std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
-        std::cout << '\n';
-        std::cout << "    " << " | " << '\n';
-
-        auto index = beforeToken.find_first_not_of(' ');
-
-        if (index != std::string::npos)
-        {
-            beforeToken = beforeToken.substr(index);
-        }
-        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
-        {
-            beforeToken = "";
-        }
-
-        std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
-        std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << ' ' << message << '\n';
-
-        break;
-    }
-    case ParserError::EXPECTED_TOKEN_MISSING: {
-        auto& [data, type, location, depth] = token;
-        auto& [file, position] = location;
-        auto& [line, column] = position;
-
-        auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
-
-        std::cout << RED << "[error]" << RESET << ": missing expected token\n";
-        std::cout << '\n';
-        std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
-        std::cout << '\n';
-        std::cout << "    " << " | " << '\n';
-
-        auto index = beforeToken.find_first_not_of(' ');
-
-        if (index != std::string::npos)
-        {
-            beforeToken = beforeToken.substr(index);
-        }
-        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
-        {
-            beforeToken = "";
-        }
-
-        std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
-        std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << ' ' << message << '\n';
-
-        break;
-    }
-    case ParserError::ENCLOSING_TOKEN_MISSING: {
-        auto& [data, type, location, depth] = token;
-        auto& [file, position] = location;
-        auto& [line, column] = position;
-
-        auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
-
-        std::cout << RED << "[error]" << RESET << ": missing enclosing token\n";
-        std::cout << '\n';
-        std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1 << '\n';
-        std::cout << '\n';
-        std::cout << "    " << " | " << '\n';
-
-        auto index = beforeToken.find_first_not_of(' ');
-
-        if (index != std::string::npos)
-        {
-            beforeToken = beforeToken.substr(index);
-        }
-        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
-        {
-            beforeToken = "";
-        }
-
-        std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
-        std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << ' ' << message << '\n';
-
-        break;
-    }
-    case ParserError::ENCLOSING_TOKEN_MISMATCH: {
-        {
-        auto& [data, type, location, depth] = token;
-        auto& [file, position] = location;
-        auto& [line, column] = position;
-
-        auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
-
-        std::cout << RED << "[error]" << RESET << ": mismatching tokens found\n";
-        std::cout << '\n';
-        std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
-        std::cout << '\n';
-        std::cout << "    " << " | " << '\n';
-
-        auto index = beforeToken.find_first_not_of(' ');
-
-        if (index != std::string::npos)
-        {
-            beforeToken = beforeToken.substr(index);
-        }
-        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
-        {
-            beforeToken = "";
-        }
-
-        std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
-        std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << ' ' << message << "\n\n";
-        }
-
-        co_yield {};
-
-        {
-        auto& [data, type, location, depth] = token;
-        auto& [file, position] = location;
-        auto& [line, column] = position;
-
-        auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
-        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
-
-        std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
-        std::cout << '\n';
-        std::cout << "    " << " | " << '\n';
-
-        auto index = beforeToken.find_first_not_of(' ');
-
-        if (index != std::string::npos)
-        {
-            beforeToken = beforeToken.substr(index);
-        }
-        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
-        {
-            beforeToken = "";
-        }
-
-        std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
-        std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << ' ' << message << '\n';
-        }
-
-        break;
-    }
+    case ParserError::UNEXPECTED_TOKEN_REACHED: { std::cout << "unexpected token"; break; }
+    case ParserError::EXPECTED_TOKEN_MISSING: { std::cout << "missing expected token"; break; }
+    case ParserError::ENCLOSING_TOKEN_MISSING: { std::cout << " missing enclosing token"; break; }
+    case ParserError::ENCLOSING_TOKEN_MISMATCH: { std::cout << "mismatching tokens found"; break; }
+    case ParserError::MISSING_RETURN_STATEMENT: { std::cout << "missing return statement"; break; }
     }
 
     std::cout << '\n';
 
-    co_return;
+    for (auto const& [token, message] : issues)
+    {
+        auto& [data, type, location, depth] = token;
+        auto& [file, position] = location;
+        auto& [line, column] = position;
+
+        auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
+        auto afterToken  = column ? lines.at(line).substr(1+column) : "";
+
+        std::cout << '\n';
+        std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
+        std::cout << '\n';
+
+        auto index = beforeToken.find_first_not_of(' ');
+
+        if (index != std::string::npos)
+        {
+            beforeToken = beforeToken.substr(index);
+        }
+        else if (std::all_of(beforeToken.begin(), beforeToken.end(), ::isspace))
+        {
+            beforeToken = "";
+        }
+
+        std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
+        std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << RED << std::string(data.size(), '^') << RESET << ' ' << message << '\n';
+    }
+
+    std::cout << '\n';
 }
 
 // cppcheck-suppress [unknownMacro]
 ENUM_CLASS(ParserWarning,
     UNEXPECTED_TOKEN_POSITION
-)
+);
 
-static Generator<void> emit_parser_warning(ParserWarning const& warning, Token const& token, std::string const& message)
+static void emit_parser_warning(ParserWarning const& warning, std::vector<std::pair<Token, std::string_view>> const& issues)
 {
     std::vector<std::string> lines {};
 
-    for (auto const& line : next_line(token.location.first))
+    for (auto const& line : next_line(issues.at(0).first.location.first))
     {
         lines.push_back(line);
     }
 
+    std::cout << YELLOW << "[warning]: " << RESET;
+
     switch (warning)
     {
-    case ParserWarning::UNEXPECTED_TOKEN_POSITION: {
+    case ParserWarning::UNEXPECTED_TOKEN_POSITION: { std::cout << "unexpected token position"; break; }
+    }
+
+    std::cout << '\n';
+
+    for (auto const& [token, message] : issues)
+    {
         auto& [data, type, location, depth] = token;
         auto& [file, position] = location;
         auto& [line, column] = position;
@@ -233,11 +127,9 @@ static Generator<void> emit_parser_warning(ParserWarning const& warning, Token c
         auto beforeToken = lines.at(line).substr(0, 1+column-data.size());
         auto afterToken  = column ? lines.at(line).substr(1+column) : "";
 
-        std::cout << YELLOW << "[warning]" << RESET << ": token in unexpected position\n";
         std::cout << '\n';
         std::cout << "at " << file.string() << ':' << line+1 << ':' << beforeToken.size() + 1<< '\n';
         std::cout << '\n';
-        std::cout << "    " << " | " << '\n';
 
         auto index = beforeToken.find_first_not_of(' ');
 
@@ -252,14 +144,7 @@ static Generator<void> emit_parser_warning(ParserWarning const& warning, Token c
 
         std::cout << GREEN << std::right << std::setw(4) << line+1 << RESET << " | " << beforeToken << BLUE << token.data << RESET << afterToken << '\n';
         std::cout << "    " << " | " << std::string(beforeToken.size(), ' ') << YELLOW << std::string(data.size(), '^') << RESET << ' ' << message << '\n';
-
-        break;
     }
-    }
-
-    std::cout << '\n';
-
-    co_return;
 }
 
 static bool expect(std::vector<Token> const& tokens, int cursor, Token::Type type)
@@ -323,7 +208,6 @@ static bool is_next_statement(std::vector<Token> const& tokens, int& cursor)
         peek(tokens, cursor, 1).data == "let" ||
         peek(tokens, cursor, 1).data == "call" ||
         peek(tokens, cursor, 1).data == "arg" ||
-        peek(tokens, cursor, 1).data == "new" ||
         peek(tokens, cursor, 1).data == "return"
         ;
 }
@@ -331,10 +215,7 @@ static bool is_next_statement(std::vector<Token> const& tokens, int& cursor)
 static bool is_next_declaration(std::vector<Token> const& tokens, int& cursor)
 {
     return
-        peek(tokens, cursor, 1).data == "function" ||
-        peek(tokens, cursor, 1).data == "class" ||
-        peek(tokens, cursor, 1).data == "ctor" ||
-        peek(tokens, cursor, 1).data == "dtor"
+        peek(tokens, cursor, 1).data == "function"
         ;
 }
 
@@ -353,125 +234,16 @@ static void synchronize(std::vector<Token> const& tokens, Token const& token, in
     }
 }
 
-static Result<std::pair<Token, std::vector<std::pair<Token, Token>>>> parse_opening_tag(std::vector<Token> const& tokens, int& cursor, std::string_view name)
-{
-    if (!advance(tokens, cursor, Token::Type::LEFT_ANGLE))
-    {
-        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, peek(tokens, cursor), "was found instead of a '<'");
-        return make_error({});
-    }
-
-    auto tag = advance(tokens, cursor, Token::Type::KEYWORD, name);
-
-    if (!tag)
-    {
-        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, peek(tokens, cursor), "was found instead of a tag");
-        return make_error({});
-    }
-
-    std::vector<std::pair<Token, Token>> properties {};
-
-    while (cursor > 1 && peek(tokens, cursor).type != Token::Type::RIGHT_ANGLE)
-    {
-        auto parameterName = advance(tokens, cursor, Token::Type::IDENTIFIER);
-
-        if (!parameterName)
-        {
-            emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, peek(tokens, cursor), "was found instead of a property name");
-            return make_error({});
-        }
-
-        if (!advance(tokens, cursor, Token::Type::EQUAL))
-        {
-            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, peek(tokens, cursor), "was found instead of equals");
-            return make_error({});
-        }
-
-        if (!advance(tokens, cursor, Token::Type::QUOTE))
-        {
-            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, peek(tokens, cursor), "was found instead of quotes");
-            return make_error({});
-        }
-
-        auto parameterType = advance(tokens, cursor, Token::Type::LITERAL);
-
-        if (!parameterType)
-        {
-            emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, peek(tokens, cursor), "was found instead of a property value");
-            return make_error({});
-        }
-
-        if (!advance(tokens, cursor, Token::Type::QUOTE))
-        {
-            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, peek(tokens, cursor), "was found instead of quotes");
-            return make_error({});
-        }
-
-        properties.push_back({ *parameterName, *parameterType });
-    }
-
-    if (!advance(tokens, cursor, Token::Type::RIGHT_ANGLE))
-    {
-        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, peek(tokens, cursor), "was found instead of a '>'");
-        return make_error({});
-    }
-
-    return std::make_pair(*tag , properties);
-}
-
-static Result<void> parse_closing_tag(std::vector<Token> const& tokens, int& cursor, Token const& tag)
-{
-    if (!advance(tokens, cursor, Token::Type::LEFT_ANGLE))
-    {
-        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, peek(tokens, cursor), "was found instead of a '<'");
-        return make_error({});
-    }
-
-    if (!advance(tokens, cursor, Token::Type::SLASH))
-    {
-        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, peek(tokens, cursor), "was found instead of a '/'");
-        return make_error({});
-    }
-
-    if (auto closing = advance(tokens, cursor, Token::Type::KEYWORD); !closing)
-    {
-        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, peek(tokens, cursor), "was found instead of a tag");
-        return make_error({});
-    }
-    else if (closing->data != tag.data)
-    {
-        using namespace std::literals;
-
-        auto token   = tag;
-        auto message = "this tag"s;
-        auto emitter = emit_parser_error(ParserError::ENCLOSING_TOKEN_MISMATCH, token, message);
-
-        token   = *closing;
-        message = "doesn't match with this one, so it cannot close.";
-        emitter.next();
-
-        return make_error({});
-    }
-
-    if (!advance(tokens, cursor, Token::Type::RIGHT_ANGLE))
-    {
-        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, peek(tokens, cursor), "was found instead of '>'");
-        return make_error({});
-    }
-
-    return {};
-}
-
 static Result<std::unique_ptr<Node>> parse_expression(std::vector<Token> const& tokens, int& cursor)
 {
-    if (peek(tokens, cursor).type == Token::Type::LITERAL)
+    if (expect(tokens, cursor, Token::Type::LITERAL))
     {
-        auto literalExpr = std::make_unique<LiteralExpr>();
-        literalExpr->value = advance(tokens, cursor).data;
-        return literalExpr;
+        auto literal = std::make_unique<LiteralExpr>();
+        literal->value = advance(tokens, cursor).data;
+        return literal;
     }
 
-    if (peek(tokens, cursor, 1).type == Token::Type::KEYWORD)
+    if (expect(tokens, cursor, Token::Type::KEYWORD))
     {
         assert("UNIMPLEMENTED" && false);
     }
@@ -479,18 +251,128 @@ static Result<std::unique_ptr<Node>> parse_expression(std::vector<Token> const& 
     return {};
 }
 
-static Result<std::unique_ptr<Node>> parse_argument(std::vector<Token> const& tokens, int& cursor)
+using Property = std::pair<Token, std::unique_ptr<Node>>;
+using Tag = std::pair<Token, std::vector<Property>>;
+
+static Result<Tag> parse_opening_tag(std::vector<Token> const& tokens, int& cursor, std::string_view name)
 {
-    auto argumentStmt = std::make_unique<ArgumentStmt>();
+    if (!advance(tokens, cursor, Token::Type::LEFT_ANGLE))
+    {
+        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of a '<'" }});
+        return make_error({});
+    }
+
+    auto tag = advance(tokens, cursor, Token::Type::KEYWORD, name);
+
+    if (!tag)
+    {
+        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of a tag" }});
+        return make_error({});
+    }
+
+    std::vector<Property> properties {};
+
+    while (cursor > 1 && peek(tokens, cursor).type != Token::Type::RIGHT_ANGLE)
+    {
+        auto propertyName = advance(tokens, cursor, Token::Type::PROPERTY);
+
+        if (!propertyName)
+        {
+            emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of a property" }});
+            return make_error({});
+        }
+
+        if (!advance(tokens, cursor, Token::Type::EQUAL))
+        {
+            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ peek(tokens, cursor), "was found instead of equals" }});
+            return make_error({});
+        }
+
+        if (!(advance(tokens, cursor, Token::Type::DOUBLE_QUOTE) || advance(tokens, cursor, Token::Type::SINGLE_QUOTE)))
+        {
+            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ peek(tokens, cursor), "was found instead of quotes" }});
+            return make_error({});
+        }
+
+        auto propertyValue = parse_expression(tokens, cursor);
+
+        if (!propertyValue)
+        {
+            emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of a property value" }});
+            return make_error({});
+        }
+
+        if (!(advance(tokens, cursor, Token::Type::DOUBLE_QUOTE) || advance(tokens, cursor, Token::Type::SINGLE_QUOTE)))
+        {
+            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ peek(tokens, cursor), "was found instead of quotes" }});
+            return make_error({});
+        }
+
+        properties.emplace_back(*propertyName, std::move(*propertyValue));
+    }
+
+    if (!advance(tokens, cursor, Token::Type::RIGHT_ANGLE))
+    {
+        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of a '>'" }});
+        return make_error({});
+    }
+
+    return std::pair { *tag, std::move(properties) };
+}
+
+static Result<void> parse_closing_tag(std::vector<Token> const& tokens, int& cursor, Token const& tag)
+{
+    if (!advance(tokens, cursor, Token::Type::LEFT_ANGLE))
+    {
+        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of a '<'" }});
+        return make_error({});
+    }
+
+    if (!advance(tokens, cursor, Token::Type::SLASH))
+    {
+        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of a '/'" }});
+        return make_error({});
+    }
+
+    if (auto closing = advance(tokens, cursor, Token::Type::KEYWORD); !closing)
+    {
+        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of a tag" }});
+        return make_error({});
+    }
+    else if (closing->data != tag.data)
+    {
+        using namespace std::literals;
+
+        emit_parser_error(ParserError::ENCLOSING_TOKEN_MISMATCH, { { tag, "this tag" }, { *closing, "does not match with this one" } });
+
+        return make_error({});
+    }
+
+    if (!advance(tokens, cursor, Token::Type::RIGHT_ANGLE))
+    {
+        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of '>'" }});
+        return make_error({});
+    }
+
+    return {};
+}
+
+static Result<std::unique_ptr<Node>> parse_statement(std::vector<Token> const& tokens, int& cursor);
+
+static Result<std::unique_ptr<Node>> parse_arg(std::vector<Token> const& tokens, int& cursor)
+{
+    auto argumentStmt = std::make_unique<ArgStmt>();
 
     auto [tag, properties] = TRY(parse_opening_tag(tokens, cursor, "arg"));
+
+    argumentStmt->token = tag;
 
     auto maybeValue = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "value"; }, &decltype(properties)::value_type::first);
     if (maybeValue != properties.end())
     {
-        auto literal = std::make_unique<LiteralExpr>();
-        literal->value = maybeValue->second.data;
-        argumentStmt->value = std::move(literal);
+        assert(maybeValue->second->node_type() == Node::Type::EXPRESSION);
+        assert(static_cast<Expression const*>(maybeValue->second.get())->expr_type() == Expression::Type::LITERAL);
+        argumentStmt->value = std::move(maybeValue->second);
     }
 
     if (!argumentStmt->value)
@@ -503,7 +385,7 @@ static Result<std::unique_ptr<Node>> parse_argument(std::vector<Token> const& to
         }
         else
         {
-            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, peek(tokens, cursor), "was found instead of 'value' property");
+            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ peek(tokens, cursor), "was found instead of 'value' property" }});
             return make_error({});
         }
     }
@@ -512,8 +394,6 @@ static Result<std::unique_ptr<Node>> parse_argument(std::vector<Token> const& to
 
     return argumentStmt;
 }
-
-static Result<std::unique_ptr<Node>> parse_statement(std::vector<Token> const& tokens, int& cursor);
 
 static Result<std::unique_ptr<Node>> parse_call(std::vector<Token> const& tokens, int& cursor)
 {
@@ -526,17 +406,19 @@ static Result<std::unique_ptr<Node>> parse_call(std::vector<Token> const& tokens
     auto maybeWho = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "who"; }, &decltype(properties)::value_type::first);
     if (maybeWho == properties.end())
     {
-        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, tag, "requires property 'who'");
+        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ tag, "requires property 'who'" }});
         return make_error({});
     }
     else
     {
-        callStmt->who = maybeWho->second.data;
+        assert(maybeWho->second->node_type() == Node::Type::EXPRESSION);
+        assert(static_cast<Expression const*>(maybeWho->second.get())->expr_type() == Expression::Type::LITERAL);
+        callStmt->who = static_cast<LiteralExpr const*>(maybeWho->second.get())->value;
     }
 
     while (cursor > 0 && peek(tokens, cursor).depth > tag.depth)
     {
-        auto argument = parse_argument(tokens, cursor);
+        auto argument = parse_arg(tokens, cursor);
 
         if (argument.has_value() && argument.value())
         {
@@ -569,46 +451,39 @@ static Result<std::unique_ptr<Node>> parse_let(std::vector<Token> const& tokens,
     auto maybeName = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "name"; }, &decltype(properties)::value_type::first);
     if (maybeName == properties.end())
     {
-        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, tag, "requires property 'name'");
+        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ tag, "requires property 'name'" }});
         return make_error({});
     }
     else
     {
-        letStmt->name = maybeName->second.data;
+        assert(maybeName->second->node_type() == Node::Type::EXPRESSION);
+        assert(static_cast<Expression const*>(maybeName->second.get())->expr_type() == Expression::Type::LITERAL);
+        letStmt->name = static_cast<LiteralExpr const*>(maybeName->second.get())->value;
     }
 
     auto maybeType = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "type"; }, &decltype(properties)::value_type::first);
     if (maybeType == properties.end())
     {
-        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, tag, "requires property 'type'");
+        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ tag, "requires property 'type'" }});
         return make_error({});
     }
     else
     {
-        letStmt->type = maybeType->second.data;
+        assert(maybeType->second->node_type() == Node::Type::EXPRESSION);
+        assert(static_cast<Expression const*>(maybeType->second.get())->expr_type() == Expression::Type::LITERAL);
+        letStmt->type = static_cast<LiteralExpr const*>(maybeType->second.get())->value;
     }
 
-    auto maybeValue = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "value"; }, &decltype(properties)::value_type::first);
-    if (maybeValue != properties.end())
+    auto value = TRY(parse_expression(tokens, cursor));
+
+    if (value)
     {
-        auto literal = std::make_unique<LiteralExpr>();
-        literal->value = maybeValue->second.data;
-        letStmt->value = std::move(literal);
+        letStmt->value = std::move(value);
     }
-
-    if (!letStmt->value)
+    else
     {
-        auto value = TRY(parse_expression(tokens, cursor));
-
-        if (value)
-        {
-            letStmt->value = std::move(value);
-        }
-        else
-        {
-            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, peek(tokens, cursor), "was found instead of property 'value'");
-            return make_error({});
-        }
+        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ peek(tokens, cursor), "was found instead of property 'value'" }});
+        return make_error({});
     }
 
     TRY(parse_closing_tag(tokens, cursor, tag));
@@ -616,9 +491,9 @@ static Result<std::unique_ptr<Node>> parse_let(std::vector<Token> const& tokens,
     return letStmt;
 }
 
-static Result<std::unique_ptr<Node>> parse_return(std::vector<Token> const& tokens, int& cursor)
+static Result<std::unique_ptr<Node>> parse_ret(std::vector<Token> const& tokens, int& cursor)
 {
-    auto returnStmt = std::make_unique<ReturnStmt>();
+    auto returnStmt = std::make_unique<RetStmt>();
 
     auto [tag, properties] = TRY(parse_opening_tag(tokens, cursor, "return"));
 
@@ -627,9 +502,7 @@ static Result<std::unique_ptr<Node>> parse_return(std::vector<Token> const& toke
     auto maybeValue = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "value"; }, &decltype(properties)::value_type::first);
     if (maybeValue != properties.end())
     {
-        auto literal = std::make_unique<LiteralExpr>();
-        literal->value = maybeValue->second.data;
-        returnStmt->value = std::move(literal);
+        assert("UNIMPLEMENTED" && false);
     }
 
     if (!returnStmt->value)
@@ -647,11 +520,92 @@ static Result<std::unique_ptr<Node>> parse_return(std::vector<Token> const& toke
     return returnStmt;
 }
 
+static Result<std::vector<std::unique_ptr<Node>>> parse_else(std::vector<Token> const& tokens, int& cursor);
+
+static Result<std::unique_ptr<Node>> parse_if(std::vector<Token> const& tokens, int& cursor)
+{
+    auto ifStmt = std::make_unique<IfStmt>();
+
+    auto [tag, properties] = TRY(parse_opening_tag(tokens, cursor, "if"));
+
+    ifStmt->token = tag;
+
+    auto maybeCondition = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "condition"; }, &decltype(properties)::value_type::first);
+    if (maybeCondition == properties.end())
+    {
+        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ tag, "requires property 'condition'" }});
+        return make_error({});
+    }
+    else
+    {
+        assert("UNIMPLEMENTED" && false);
+    }
+
+    while (cursor > 0 && peek(tokens, cursor).depth > tag.depth)
+    {
+        auto node = parse_statement(tokens, cursor);
+
+        if (node.has_value() && node.value())
+        {
+            ifStmt->trueBranch.push_back(std::move(node.value()));
+            continue;
+        }
+
+        if (!node.has_value())
+        {
+            synchronize(tokens, tag, cursor);
+            continue;
+        }
+
+        break;
+    }
+
+    TRY(parse_closing_tag(tokens, cursor, tag));
+
+    if (peek(tokens, cursor, 1).type == Token::Type::KEYWORD && peek(tokens, cursor, 1).data == "else")
+    {
+        ifStmt->falseBranch = TRY(parse_else(tokens, cursor));
+    }
+
+    return ifStmt;
+}
+
+static Result<std::vector<std::unique_ptr<Node>>> parse_else(std::vector<Token> const& tokens, int& cursor)
+{
+    std::vector<std::unique_ptr<Node>> nodes {};
+
+    auto [tag, _] = TRY(parse_opening_tag(tokens, cursor, "else"));
+
+    while (cursor > 0 && peek(tokens, cursor).depth > tag.depth)
+    {
+        auto node = parse_statement(tokens, cursor);
+
+        if (node.has_value() && node.value())
+        {
+            nodes.push_back(std::move(node.value()));
+            continue;
+        }
+
+        if (!node.has_value())
+        {
+            synchronize(tokens, tag, cursor);
+            continue;
+        }
+
+        break;
+    }
+
+    TRY(parse_closing_tag(tokens, cursor, tag));
+
+    return {};
+}
+
 static Result<std::unique_ptr<Node>> parse_statement(std::vector<Token> const& tokens, int& cursor)
 {
     if (peek(tokens, cursor, 1).data == "let") return parse_let(tokens, cursor);
     if (peek(tokens, cursor, 1).data == "call") return parse_call(tokens, cursor);
-    if (peek(tokens, cursor, 1).data == "return") return parse_return(tokens, cursor);
+    if (peek(tokens, cursor, 1).data == "return") return parse_ret(tokens, cursor);
+    if (peek(tokens, cursor, 1).data == "if") return parse_if(tokens, cursor);
 
     return {};
 }
@@ -669,36 +623,42 @@ static Result<std::unique_ptr<Node>> parse_function(std::vector<Token> const& to
     auto maybeName = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "name"; }, &decltype(properties)::value_type::first);
     if (maybeName == properties.end())
     {
-        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, tag, "requires property 'name'");
+        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ tag, "requires property 'name'" }});
         return make_error({});
     }
     else if (std::distance(properties.begin(), maybeName) != 0)
     {
-        emit_parser_warning(ParserWarning::UNEXPECTED_TOKEN_POSITION, maybeName->first, "should appear in first");
+        emit_parser_warning(ParserWarning::UNEXPECTED_TOKEN_POSITION, {{ maybeName->first, "should appear in first" }});
     }
     else
     {
-        functionDecl->name = maybeName->second.data;
+        assert(maybeName->second->node_type() == Node::Type::EXPRESSION);
+        assert(static_cast<Expression const*>(maybeName->second.get())->expr_type() == Expression::Type::LITERAL);
+        functionDecl->name = static_cast<LiteralExpr const*>(maybeName->second.get())->value;
     }
 
-    auto maybeResult = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "result"; }, &decltype(properties)::value_type::first);
-    if (maybeResult == properties.end())
+    auto maybeType = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "type"; }, &decltype(properties)::value_type::first);
+    if (maybeType == properties.end())
     {
-        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, tag, "requires property 'result'");
+        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ tag, "requires property 'type'" }});
         return make_error({});
     }
-    else if (std::distance(properties.begin(), maybeResult) != 1)
+    else if (std::distance(properties.begin(), maybeType) != 1)
     {
-        emit_parser_warning(ParserWarning::UNEXPECTED_TOKEN_POSITION, maybeResult->first, "should appear in second");
+        emit_parser_warning(ParserWarning::UNEXPECTED_TOKEN_POSITION, {{ maybeType->first, "should appear in second" }});
     }
     else
     {
-        functionDecl->result = maybeResult->second.data;
+        assert(maybeType->second->node_type() == Node::Type::EXPRESSION);
+        assert(static_cast<Expression const*>(maybeType->second.get())->expr_type() == Expression::Type::LITERAL);
+        functionDecl->type = static_cast<LiteralExpr const*>(maybeType->second.get())->value;
     }
 
     for (auto const& [name, value] : properties | std::views::drop(2))
     {
-        functionDecl->parameters.push_back({ name.data, value.data });
+        assert(value->node_type() == Node::Type::EXPRESSION);
+        assert(static_cast<Expression const*>(value.get())->expr_type() == Expression::Type::LITERAL);
+        functionDecl->parameters.push_back({ name.data, static_cast<LiteralExpr const*>(value.get())->value });
     }
 
     while (cursor > 0 && peek(tokens, cursor).depth > tag.depth)
@@ -728,8 +688,21 @@ static Result<std::unique_ptr<Node>> parse_function(std::vector<Token> const& to
 
     if (maybeReturn == functionDecl->scope.end())
     {
-        auto returnStmt = std::make_unique<ReturnStmt>();
-        functionDecl->scope.push_back(std::move(returnStmt));
+        if (functionDecl->type == "none")
+        {
+            auto returnStmt = std::make_unique<RetStmt>();
+            returnStmt->type = functionDecl->type;
+            functionDecl->scope.push_back(std::move(returnStmt));
+        }
+        else
+        {
+            emit_parser_error(ParserError::MISSING_RETURN_STATEMENT, {{ tag, "expects a value to be returned, yet no <return> tag was found." }});
+            return make_error({});
+        }
+    }
+    else
+    {
+        static_cast<RetStmt*>(maybeReturn->get())->type = functionDecl->type;
     }
 
     TRY(parse_closing_tag(tokens, cursor, tag));
@@ -737,198 +710,9 @@ static Result<std::unique_ptr<Node>> parse_function(std::vector<Token> const& to
     return functionDecl;
 }
 
-static Result<std::unique_ptr<Node>> parse_ctor(std::vector<Token> const& tokens, int& cursor)
-{
-    auto ctorDecl = std::make_unique<FunctionDecl>();
-
-    auto [tag, properties] = TRY(parse_opening_tag(tokens, cursor, "ctor"));
-
-    ctorDecl->token = tag;
-    ctorDecl->name = "ctor";
-
-    while (cursor > 0 && peek(tokens, cursor).depth > tag.depth)
-    {
-        Result<std::unique_ptr<Node>> node;
-
-        if (is_next_declaration(tokens, cursor)) node = parse_declaration(tokens, cursor);
-        else if (is_next_statement(tokens, cursor)) node = parse_statement(tokens, cursor);
-
-        if (node.has_value() && node.value())
-        {
-            ctorDecl->scope.push_back(std::move(node.value()));
-            continue;
-        }
-
-        if (!node.has_value())
-        {
-            synchronize(tokens, tag, cursor);
-            continue;
-        }
-
-        break;
-    }
-
-    TRY(parse_closing_tag(tokens, cursor, tag));
-
-    return ctorDecl;
-
-}
-
-static Result<std::unique_ptr<Node>> parse_dtor(std::vector<Token> const& tokens, int& cursor)
-{
-    auto dtorDecl = std::make_unique<FunctionDecl>();
-
-    auto [tag, properties] = TRY(parse_opening_tag(tokens, cursor, "dtor"));
-
-    dtorDecl->token = tag;
-    dtorDecl->name = "dtor";
-
-    while (cursor > 0 && peek(tokens, cursor).depth > tag.depth)
-    {
-        Result<std::unique_ptr<Node>> node;
-
-        if (is_next_declaration(tokens, cursor)) node = parse_declaration(tokens, cursor);
-        else if (is_next_statement(tokens, cursor)) node = parse_statement(tokens, cursor);
-
-        if (node.has_value() && node.value())
-        {
-            dtorDecl->scope.push_back(std::move(node.value()));
-            continue;
-        }
-
-        if (!node.has_value())
-        {
-            synchronize(tokens, tag, cursor);
-            continue;
-        }
-
-        break;
-    }
-
-    TRY(parse_closing_tag(tokens, cursor, tag));
-
-    return dtorDecl;
-
-}
-
-static Result<std::unique_ptr<Node>> parse_class(std::vector<Token> const& tokens, int& cursor)
-{
-    auto classDecl = std::make_unique<ClassDecl>();
-
-    auto [tag, properties] = TRY(parse_opening_tag(tokens, cursor, "class"));
-
-    classDecl->token = tag;
-
-    auto maybeName = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "name"; }, &decltype(properties)::value_type::first);
-    if (maybeName == properties.end())
-    {
-        Token expected {};
-        expected.type = Token::Type::IDENTIFIER;
-        expected.data = "name";
-        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, tag, "requires property 'name'");
-        return make_error({});
-    }
-    else if (std::distance(properties.begin(), maybeName) != 0)
-    {
-        emit_parser_warning(ParserWarning::UNEXPECTED_TOKEN_POSITION, maybeName->first, "should appear in first");
-    }
-    else
-    {
-        classDecl->name = maybeName->second.data;
-    }
-
-    auto maybeInherits = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "inherits"; }, &decltype(properties)::value_type::first);
-    if (maybeInherits != properties.end())
-    {
-        std::stringstream stream(maybeInherits->second.data);
-        std::string inherited;
-
-        while (std::getline(stream, inherited, ','))
-        {
-            classDecl->inherits.push_back(inherited);
-        }
-    }
-    else if (std::distance(properties.begin(), maybeInherits) != 1)
-    {
-        emit_parser_warning(ParserWarning::UNEXPECTED_TOKEN_POSITION, maybeInherits->first, "should appear in second");
-    }
-
-    while (cursor > 0 && peek(tokens, cursor).depth > tag.depth)
-    {
-        Result<std::unique_ptr<Node>> node;
-
-        if (is_next_declaration(tokens, cursor)) node = parse_declaration(tokens, cursor);
-        else if (is_next_statement(tokens, cursor)) node = parse_statement(tokens, cursor);
-
-        if (node.has_value() && node.value())
-        {
-            classDecl->scope.push_back(std::move(node.value()));
-            continue;
-        }
-
-        if (!node.has_value())
-        {
-            synchronize(tokens, tag, cursor);
-            continue;
-        }
-
-        break;
-    }
-
-    auto maybeCtor = std::find_if(classDecl->scope.begin(), classDecl->scope.end(), [] (std::unique_ptr<Node> const& node) {
-        return
-            node->node_type() == Node::Type::DECLARATION &&
-            static_cast<Declaration*>(node.get())->decl_type() == Declaration::Type::FUNCTION &&
-            static_cast<FunctionDecl*>(node.get())->name == "ctor";
-    });
-
-    if (maybeCtor == classDecl->scope.end())
-    {
-        auto ctor = std::make_unique<FunctionDecl>();
-        ctor->name = "ctor";
-        ctor->result = "none";
-        ctor->parameters.push_back(std::make_pair("self", classDecl->name));
-
-        classDecl->scope.insert(classDecl->scope.begin(), std::move(ctor));
-    }
-    else
-    {
-        static_cast<FunctionDecl*>(maybeCtor->get())->parameters.push_back(std::make_pair("self", classDecl->name));
-    }
-
-    auto maybeDtor = std::find_if(classDecl->scope.begin(), classDecl->scope.end(), [] (std::unique_ptr<Node> const& node) {
-        return
-            node->node_type() == Node::Type::DECLARATION &&
-            static_cast<Declaration*>(node.get())->decl_type() == Declaration::Type::FUNCTION &&
-            static_cast<FunctionDecl*>(node.get())->name == "dtor";
-    });
-
-    if (maybeDtor == classDecl->scope.end())
-    {
-        auto dtor = std::make_unique<FunctionDecl>();
-        dtor->name = "dtor";
-        dtor->result = "none";
-        dtor->parameters.push_back(std::make_pair("self", classDecl->name));
-
-        classDecl->scope.insert(std::next(classDecl->scope.begin()), std::move(dtor));
-    }
-    else
-    {
-        static_cast<FunctionDecl*>(maybeDtor->get())->parameters.push_back(std::make_pair("self", classDecl->name));
-    }
-
-    TRY(parse_closing_tag(tokens, cursor, tag));
-
-    return classDecl;
-}
-
 static Result<std::unique_ptr<Node>> parse_declaration(std::vector<Token> const& tokens, int& cursor)
 {
     if (peek(tokens, cursor, 1).data == "function") return TRY(parse_function(tokens, cursor));
-    if (peek(tokens, cursor, 1).data == "class") return TRY(parse_class(tokens, cursor));
-    if (peek(tokens, cursor, 1).data == "ctor") return TRY(parse_ctor(tokens, cursor));
-    if (peek(tokens, cursor, 1).data == "dtor") return TRY(parse_dtor(tokens, cursor));
-
     return {};
 }
 
@@ -1024,8 +808,8 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
 
                 break;
             }
-            case Statement::Type::ARGUMENT: {
-                auto argumentStmt = static_cast<ArgumentStmt*>(statement);
+            case Statement::Type::ARG: {
+                auto argumentStmt = static_cast<ArgStmt*>(statement);
 
                 ast = {{
                     argumentStmt->stmt_type(), {
@@ -1036,10 +820,11 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 break;
             }
             case Statement::Type::RETURN: {
-                auto returnStmt = static_cast<ReturnStmt*>(statement);
+                auto returnStmt = static_cast<RetStmt*>(statement);
 
                 ast = {{
                     returnStmt->stmt_type(), {
+                        { "type", returnStmt->type },
                         { "value", returnStmt->value ? dump_ast(returnStmt->value) : "none" },
                     }
                 }};
@@ -1059,20 +844,25 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
 
                 break;
             }
-            case Statement::Type::EXPRESSION: {
-                auto expression = static_cast<Expression*>(statement);
+            case Statement::Type::IF: {
+                auto ifStmt = static_cast<IfStmt*>(statement);
 
-                switch (expression->expr_type())
+                ast = {{
+                    ifStmt->stmt_type(), {
+                        { "condition", dump_ast(ifStmt->condition) },
+                        { "trueBranch", nlohmann::json::array() },
+                        { "falseBranch", nlohmann::json::array() },
+                    }
+                }};
+
+                for (auto const& child : ifStmt->trueBranch)
                 {
-                case Expression::Type::LITERAL: {
-                    auto literalExpr = static_cast<LiteralExpr*>(expression);
-                    ast = {{
-                        literalExpr->expr_type(), {
-                            { "value", literalExpr->value },
-                        }
-                    }};
-                    break;
+                    ast[ifStmt->stmt_type().to_string()]["trueBranch"].push_back(dump_ast(child));
                 }
+
+                for (auto const& child : ifStmt->falseBranch)
+                {
+                    ast[ifStmt->stmt_type().to_string()]["falseBranch"].push_back(dump_ast(child));
                 }
 
                 break;
@@ -1087,17 +877,17 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
             switch (declaration->decl_type())
             {
             case Declaration::Type::PROGRAM: {
-                auto program = static_cast<Declaration*>(declaration);
+                auto programDecl = static_cast<Declaration*>(declaration);
 
                 ast = {{
-                    program->decl_type(), {
+                    programDecl->decl_type(), {
                         { "scope", nlohmann::json::array() }
                     }
                 }};
 
-                for (auto const& child : program->scope)
+                for (auto const& child : programDecl->scope)
                 {
-                    ast[program->decl_type().to_string()]["scope"].push_back(dump_ast(child));
+                    ast[programDecl->decl_type().to_string()]["scope"].push_back(dump_ast(child));
                 }
 
                 break;
@@ -1108,7 +898,7 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
                 ast = {{
                     functionDecl->decl_type(), {
                         { "name", functionDecl->name },
-                        { "result", functionDecl->result },
+                        { "type", functionDecl->type },
                         { "parameters", nlohmann::json::array() },
                         { "scope", nlohmann::json::array() }
                     }
@@ -1126,29 +916,28 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
 
                 break;
             }
-            case Declaration::Type::CLASS: {
-                auto classDecl = static_cast<ClassDecl*>(declaration);
+            }
+
+            break;
+        }
+        case Node::Type::EXPRESSION: {
+            auto expression = static_cast<Expression*>(node.get());
+
+            switch (expression->expr_type())
+            {
+            case Expression::Type::LITERAL: {
+                auto literalExpr = static_cast<LiteralExpr*>(expression);
 
                 ast = {{
-                    classDecl->decl_type(), {
-                        { "name", classDecl->name },
-                        { "inherits", nlohmann::json::array() },
-                        { "scope", nlohmann::json::array() }
+                    literalExpr->expr_type(), {
+                        { "value", literalExpr->value }
                     }
                 }};
 
-                for (auto const& parameter : classDecl->inherits)
-                {
-                    ast[classDecl->decl_type().to_string()]["inherits"].push_back(parameter);
-                }
-
-                for (auto const& child : declaration->scope)
-                {
-                    ast[classDecl->decl_type().to_string()]["scope"].push_back(dump_ast(child));
-                }
-
                 break;
             }
+            case Expression::Type::ARITHMETIC: assert("UNIMPLEMENTED" && false);
+            case Expression::Type::LOGICAL: assert("UNIMPLEMENTED" && false);
             }
 
             break;
