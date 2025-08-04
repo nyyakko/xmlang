@@ -238,25 +238,109 @@ static void synchronize(std::vector<Token> const& tokens, Token const& token, in
     }
 }
 
-static Result<std::unique_ptr<Node>> parse_expression(std::vector<Token> const& tokens, int& cursor)
-{
-    if (expect(tokens, cursor, Token::Type::LITERAL))
-    {
-        auto literal = std::make_unique<LiteralExpr>();
-        literal->value = advance(tokens, cursor).data;
-        return literal;
-    }
-
-    if (expect(tokens, cursor, Token::Type::KEYWORD))
-    {
-        assert("UNIMPLEMENTED" && false);
-    }
-
-    return {};
-}
-
 using Property = std::pair<Token, std::unique_ptr<Node>>;
 using Tag = std::pair<Token, std::vector<Property>>;
+
+static Result<Tag> parse_opening_tag(std::vector<Token> const& tokens, int& cursor, std::string_view name);
+static Result<void> parse_closing_tag(std::vector<Token> const& tokens, int& cursor, Token const& tag);
+
+static Result<std::unique_ptr<Node>> parse_expression(std::vector<Token> const& tokens, int& cursor);
+
+static Result<std::unique_ptr<Node>> parse_arg_expression(std::vector<Token> const& tokens, int& cursor)
+{
+    auto argumentStmt = std::make_unique<ArgExpr>();
+
+    auto [tag, properties] = TRY(parse_opening_tag(tokens, cursor, "arg"));
+
+    argumentStmt->token = tag;
+
+    auto maybeValue = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "value"; }, &decltype(properties)::value_type::first);
+    if (maybeValue != properties.end())
+    {
+        assert(maybeValue->second->node_type() == Node::Type::EXPRESSION);
+        assert(static_cast<Expression const*>(maybeValue->second.get())->expr_type() == Expression::Type::LITERAL);
+        argumentStmt->value = std::move(maybeValue->second);
+    }
+
+    if (!argumentStmt->value)
+    {
+        auto value = TRY(parse_expression(tokens, cursor));
+
+        if (value)
+        {
+            argumentStmt->value = std::move(value);
+        }
+        else
+        {
+            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ peek(tokens, cursor), "was found instead of 'value' property" }});
+            return make_error({});
+        }
+    }
+
+    TRY(parse_closing_tag(tokens, cursor, tag));
+
+    return argumentStmt;
+}
+
+static Result<std::unique_ptr<Node>> parse_call_expression(std::vector<Token> const& tokens, int& cursor)
+{
+    auto callExpr = std::make_unique<CallExpr>();
+
+    auto [tag, properties] = TRY(parse_opening_tag(tokens, cursor, "call"));
+
+    callExpr->token = tag;
+
+    auto maybeWho = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "who"; }, &decltype(properties)::value_type::first);
+    if (maybeWho == properties.end())
+    {
+        emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ tag, "requires property 'who'" }});
+        return make_error({});
+    }
+    else
+    {
+        assert(maybeWho->second->node_type() == Node::Type::EXPRESSION);
+        assert(static_cast<Expression const*>(maybeWho->second.get())->expr_type() == Expression::Type::LITERAL);
+        callExpr->who = static_cast<LiteralExpr const*>(maybeWho->second.get())->value;
+    }
+
+    while (cursor > 0 && peek(tokens, cursor).depth > tag.depth)
+    {
+        auto argument = parse_arg_expression(tokens, cursor);
+
+        if (argument.has_value() && argument.value())
+        {
+            callExpr->arguments.push_back(std::move(argument.value()));
+            continue;
+        }
+
+        if (!argument.has_value())
+        {
+            synchronize(tokens, tag, cursor);
+            continue;
+        }
+
+        break;
+    }
+
+    TRY(parse_closing_tag(tokens, cursor, tag));
+
+    return callExpr;
+}
+
+static Result<std::unique_ptr<Node>> parse_expression(std::vector<Token> const& tokens, int& cursor)
+{
+    if (peek(tokens, cursor).type == Token::Type::LITERAL)
+    {
+        auto literalExpr = std::make_unique<LiteralExpr>();
+        literalExpr->value = advance(tokens, cursor).data;
+        return literalExpr;
+    }
+
+    if (peek(tokens, cursor, 1).data == "call") return parse_call_expression(tokens, cursor);
+    if (peek(tokens, cursor, 1).data == "arg") return parse_arg_expression(tokens, cursor);
+
+    assert("UNREACHABLE" && false);
+}
 
 static Result<Tag> parse_opening_tag(std::vector<Token> const& tokens, int& cursor, std::string_view name)
 {
@@ -270,7 +354,7 @@ static Result<Tag> parse_opening_tag(std::vector<Token> const& tokens, int& curs
 
     if (!tag)
     {
-        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of a tag" }});
+        emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), fmt::format("was found instead of a {}", name) }});
         return make_error({});
     }
 
@@ -299,12 +383,6 @@ static Result<Tag> parse_opening_tag(std::vector<Token> const& tokens, int& curs
         }
 
         auto propertyValue = parse_expression(tokens, cursor);
-
-        if (!propertyValue)
-        {
-            emit_parser_error(ParserError::UNEXPECTED_TOKEN_REACHED, {{ peek(tokens, cursor), "was found instead of a property value" }});
-            return make_error({});
-        }
 
         if (!(advance(tokens, cursor, Token::Type::DOUBLE_QUOTE) || advance(tokens, cursor, Token::Type::SINGLE_QUOTE)))
         {
@@ -363,43 +441,7 @@ static Result<void> parse_closing_tag(std::vector<Token> const& tokens, int& cur
 
 static Result<std::unique_ptr<Node>> parse_statement(std::vector<Token> const& tokens, int& cursor);
 
-static Result<std::unique_ptr<Node>> parse_arg(std::vector<Token> const& tokens, int& cursor)
-{
-    auto argumentStmt = std::make_unique<ArgStmt>();
-
-    auto [tag, properties] = TRY(parse_opening_tag(tokens, cursor, "arg"));
-
-    argumentStmt->token = tag;
-
-    auto maybeValue = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "value"; }, &decltype(properties)::value_type::first);
-    if (maybeValue != properties.end())
-    {
-        assert(maybeValue->second->node_type() == Node::Type::EXPRESSION);
-        assert(static_cast<Expression const*>(maybeValue->second.get())->expr_type() == Expression::Type::LITERAL);
-        argumentStmt->value = std::move(maybeValue->second);
-    }
-
-    if (!argumentStmt->value)
-    {
-        auto value = TRY(parse_expression(tokens, cursor));
-
-        if (value)
-        {
-            argumentStmt->value = std::move(value);
-        }
-        else
-        {
-            emit_parser_error(ParserError::EXPECTED_TOKEN_MISSING, {{ peek(tokens, cursor), "was found instead of 'value' property" }});
-            return make_error({});
-        }
-    }
-
-    TRY(parse_closing_tag(tokens, cursor, tag));
-
-    return argumentStmt;
-}
-
-static Result<std::unique_ptr<Node>> parse_call(std::vector<Token> const& tokens, int& cursor)
+static Result<std::unique_ptr<Node>> parse_call_statement(std::vector<Token> const& tokens, int& cursor)
 {
     auto callStmt = std::make_unique<CallStmt>();
 
@@ -422,7 +464,7 @@ static Result<std::unique_ptr<Node>> parse_call(std::vector<Token> const& tokens
 
     while (cursor > 0 && peek(tokens, cursor).depth > tag.depth)
     {
-        auto argument = parse_arg(tokens, cursor);
+        auto argument = parse_arg_expression(tokens, cursor);
 
         if (argument.has_value() && argument.value())
         {
@@ -444,7 +486,7 @@ static Result<std::unique_ptr<Node>> parse_call(std::vector<Token> const& tokens
     return callStmt;
 }
 
-static Result<std::unique_ptr<Node>> parse_let(std::vector<Token> const& tokens, int& cursor)
+static Result<std::unique_ptr<Node>> parse_let_statement(std::vector<Token> const& tokens, int& cursor)
 {
     auto letStmt = std::make_unique<LetStmt>();
 
@@ -495,7 +537,7 @@ static Result<std::unique_ptr<Node>> parse_let(std::vector<Token> const& tokens,
     return letStmt;
 }
 
-static Result<std::unique_ptr<Node>> parse_ret(std::vector<Token> const& tokens, int& cursor)
+static Result<std::unique_ptr<Node>> parse_ret_statement(std::vector<Token> const& tokens, int& cursor)
 {
     auto returnStmt = std::make_unique<RetStmt>();
 
@@ -506,7 +548,9 @@ static Result<std::unique_ptr<Node>> parse_ret(std::vector<Token> const& tokens,
     auto maybeValue = std::ranges::find_if(properties, [] (auto&& current) { return current.data == "value"; }, &decltype(properties)::value_type::first);
     if (maybeValue != properties.end())
     {
-        assert("UNIMPLEMENTED" && false);
+        assert(maybeValue->second->node_type() == Node::Type::EXPRESSION);
+        assert(static_cast<Expression const*>(maybeValue->second.get())->expr_type() == Expression::Type::LITERAL);
+        returnStmt->value = std::move(maybeValue->second);
     }
 
     if (!returnStmt->value)
@@ -524,9 +568,9 @@ static Result<std::unique_ptr<Node>> parse_ret(std::vector<Token> const& tokens,
     return returnStmt;
 }
 
-static Result<std::vector<std::unique_ptr<Node>>> parse_else(std::vector<Token> const& tokens, int& cursor);
+static Result<std::vector<std::unique_ptr<Node>>> parse_else_statement(std::vector<Token> const& tokens, int& cursor);
 
-static Result<std::unique_ptr<Node>> parse_if(std::vector<Token> const& tokens, int& cursor)
+static Result<std::unique_ptr<Node>> parse_if_statement(std::vector<Token> const& tokens, int& cursor)
 {
     auto ifStmt = std::make_unique<IfStmt>();
 
@@ -568,13 +612,13 @@ static Result<std::unique_ptr<Node>> parse_if(std::vector<Token> const& tokens, 
 
     if (peek(tokens, cursor, 1).type == Token::Type::KEYWORD && peek(tokens, cursor, 1).data == "else")
     {
-        ifStmt->falseBranch = TRY(parse_else(tokens, cursor));
+        ifStmt->falseBranch = TRY(parse_else_statement(tokens, cursor));
     }
 
     return ifStmt;
 }
 
-static Result<std::vector<std::unique_ptr<Node>>> parse_else(std::vector<Token> const& tokens, int& cursor)
+static Result<std::vector<std::unique_ptr<Node>>> parse_else_statement(std::vector<Token> const& tokens, int& cursor)
 {
     std::vector<std::unique_ptr<Node>> nodes {};
 
@@ -606,17 +650,17 @@ static Result<std::vector<std::unique_ptr<Node>>> parse_else(std::vector<Token> 
 
 static Result<std::unique_ptr<Node>> parse_statement(std::vector<Token> const& tokens, int& cursor)
 {
-    if (peek(tokens, cursor, 1).data == "let") return parse_let(tokens, cursor);
-    if (peek(tokens, cursor, 1).data == "call") return parse_call(tokens, cursor);
-    if (peek(tokens, cursor, 1).data == "return") return parse_ret(tokens, cursor);
-    if (peek(tokens, cursor, 1).data == "if") return parse_if(tokens, cursor);
+    if (peek(tokens, cursor, 1).data == "let") return parse_let_statement(tokens, cursor);
+    if (peek(tokens, cursor, 1).data == "call") return parse_call_statement(tokens, cursor);
+    if (peek(tokens, cursor, 1).data == "return") return parse_ret_statement(tokens, cursor);
+    if (peek(tokens, cursor, 1).data == "if") return parse_if_statement(tokens, cursor);
 
-    return {};
+    assert("UNREACHABLE" && false);
 }
 
 static Result<std::unique_ptr<Node>> parse_declaration(std::vector<Token> const& tokens, int& cursor);
 
-static Result<std::unique_ptr<Node>> parse_function(std::vector<Token> const& tokens, int& cursor)
+static Result<std::unique_ptr<Node>> parse_function_declaration(std::vector<Token> const& tokens, int& cursor)
 {
     auto functionDecl = std::make_unique<FunctionDecl>();
 
@@ -716,7 +760,7 @@ static Result<std::unique_ptr<Node>> parse_function(std::vector<Token> const& to
 
 static Result<std::unique_ptr<Node>> parse_declaration(std::vector<Token> const& tokens, int& cursor)
 {
-    if (peek(tokens, cursor, 1).data == "function") return TRY(parse_function(tokens, cursor));
+    if (peek(tokens, cursor, 1).data == "function") return TRY(parse_function_declaration(tokens, cursor));
     return {};
 }
 
@@ -793,80 +837,60 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
         case Node::Type::STATEMENT: {
             auto statement = static_cast<Statement*>(node.get());
 
+            ast = {{
+                "statement", {
+                    { "stmt_type", magic_enum::enum_name(statement->stmt_type()) }
+                }
+            }};
+
             switch (statement->stmt_type())
             {
             case Statement::Type::CALL: {
-                auto callStmt = static_cast<CallStmt*>(statement);
+                auto callStmt = static_cast<CallStmt const*>(statement);
 
-                ast = {{
-                    magic_enum::enum_name(callStmt->stmt_type()), {
-                        { "who", callStmt->who },
-                        { "arguments", nlohmann::json::array() }
-                    }
-                }};
+                ast["statement"].push_back({ "who", callStmt->who });
+                ast["statement"].push_back({ "arguments", nlohmann::json::array() });
 
                 for (auto const& child : callStmt->arguments)
                 {
-                    ast[magic_enum::enum_name(callStmt->stmt_type())]["arguments"].push_back(dump_ast(child));
+                    ast["statement"]["arguments"].push_back(dump_ast(child));
                 }
-
-                break;
-            }
-            case Statement::Type::ARG: {
-                auto argumentStmt = static_cast<ArgStmt*>(statement);
-
-                ast = {{
-                    magic_enum::enum_name(argumentStmt->stmt_type()), {
-                        { "value", dump_ast(argumentStmt->value) },
-                    }
-                }};
 
                 break;
             }
             case Statement::Type::RETURN: {
-                auto returnStmt = static_cast<RetStmt*>(statement);
+                auto returnStmt = static_cast<RetStmt const*>(statement);
 
-                ast = {{
-                    magic_enum::enum_name(returnStmt->stmt_type()), {
-                        { "type", returnStmt->type },
-                        { "value", returnStmt->value ? dump_ast(returnStmt->value) : "none" },
-                    }
-                }};
+                if (returnStmt->value)
+                {
+                    ast["statement"].push_back({ "type", returnStmt->type });
+                    ast["statement"].push_back({ "value", dump_ast(returnStmt->value) });
+                }
 
                 break;
             }
             case Statement::Type::LET: {
-                auto letStmt = static_cast<LetStmt*>(statement);
-
-                ast = {{
-                    magic_enum::enum_name(letStmt->stmt_type()), {
-                        { "name", letStmt->name },
-                        { "type", letStmt->type },
-                        { "value", dump_ast(letStmt->value) },
-                    }
-                }};
-
+                auto letStmt = static_cast<LetStmt const*>(statement);
+                ast["statement"].push_back({ "name", letStmt->name });
+                ast["statement"].push_back({ "type", letStmt->type });
+                ast["statement"].push_back({ "value", dump_ast(letStmt->value) });
                 break;
             }
             case Statement::Type::IF: {
-                auto ifStmt = static_cast<IfStmt*>(statement);
+                auto ifStmt = static_cast<IfStmt const*>(statement);
 
-                ast = {{
-                    magic_enum::enum_name(ifStmt->stmt_type()), {
-                        { "condition", dump_ast(ifStmt->condition) },
-                        { "trueBranch", nlohmann::json::array() },
-                        { "falseBranch", nlohmann::json::array() },
-                    }
-                }};
+                ast["statement"].push_back({ "condition", dump_ast(ifStmt->condition) });
+                ast["statement"].push_back({ "trueBranch", nlohmann::json::array() });
+                ast["statement"].push_back({ "falseBranch", nlohmann::json::array() });
 
                 for (auto const& child : ifStmt->trueBranch)
                 {
-                    ast[magic_enum::enum_name(ifStmt->stmt_type())]["trueBranch"].push_back(dump_ast(child));
+                    ast["statement"]["trueBranch"].push_back(dump_ast(child));
                 }
 
                 for (auto const& child : ifStmt->falseBranch)
                 {
-                    ast[magic_enum::enum_name(ifStmt->stmt_type())]["falseBranch"].push_back(dump_ast(child));
+                    ast["statement"]["falseBranch"].push_back(dump_ast(child));
                 }
 
                 break;
@@ -876,46 +900,44 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
             break;
         }
         case Node::Type::DECLARATION: {
-            auto declaration = static_cast<Declaration*>(node.get());
+            auto declaration = static_cast<Declaration const*>(node.get());
+
+            ast = {{
+                "declaration", {
+                    { "decl_type", magic_enum::enum_name(declaration->decl_type()) }
+                }
+            }};
 
             switch (declaration->decl_type())
             {
             case Declaration::Type::PROGRAM: {
-                auto programDecl = static_cast<Declaration*>(declaration);
+                auto programDecl = static_cast<Declaration const*>(declaration);
 
-                ast = {{
-                    magic_enum::enum_name(programDecl->decl_type()), {
-                        { "scope", nlohmann::json::array() }
-                    }
-                }};
+                ast["declaration"].push_back({ "scope", nlohmann::json::array() });
 
                 for (auto const& child : programDecl->scope)
                 {
-                    ast[magic_enum::enum_name(programDecl->decl_type())]["scope"].push_back(dump_ast(child));
+                    ast["declaration"]["scope"].push_back(dump_ast(child));
                 }
 
                 break;
             }
             case Declaration::Type::FUNCTION: {
-                auto functionDecl = static_cast<FunctionDecl*>(declaration);
+                auto functionDecl = static_cast<FunctionDecl const*>(declaration);
 
-                ast = {{
-                    magic_enum::enum_name(functionDecl->decl_type()), {
-                        { "name", functionDecl->name },
-                        { "type", functionDecl->type },
-                        { "parameters", nlohmann::json::array() },
-                        { "scope", nlohmann::json::array() }
-                    }
-                }};
+                ast["declaration"].push_back({ "name", functionDecl->name });
+                ast["declaration"].push_back({ "type", functionDecl->type });
+                ast["declaration"].push_back({ "parameters", nlohmann::json::array() });
+                ast["declaration"].push_back({ "scope", nlohmann::json::array() });
 
                 for (auto const& parameter : functionDecl->parameters)
                 {
-                    ast[magic_enum::enum_name(functionDecl->decl_type())]["parameters"].push_back({ { "name", parameter.first }, { "type", parameter.second } });
+                    ast["declaration"]["parameters"].push_back({ { "name", parameter.first }, { "type", parameter.second } });
                 }
 
                 for (auto const& child : declaration->scope)
                 {
-                    ast[magic_enum::enum_name(functionDecl->decl_type())]["scope"].push_back(dump_ast(child));
+                    ast["declaration"]["scope"].push_back(dump_ast(child));
                 }
 
                 break;
@@ -925,18 +947,36 @@ nlohmann::ordered_json dump_ast(std::unique_ptr<Node> const& node)
             break;
         }
         case Node::Type::EXPRESSION: {
-            auto expression = static_cast<Expression*>(node.get());
+            auto expression = static_cast<Expression const*>(node.get());
+
+            ast = {{
+                "expression", {
+                    { "expr_type", magic_enum::enum_name(expression->expr_type()) }
+                }
+            }};
 
             switch (expression->expr_type())
             {
+            case Expression::Type::ARG: {
+                auto argumentExpr = static_cast<ArgExpr const*>(expression);
+                ast["statement"].push_back({ "value", dump_ast(argumentExpr->value) });
+                break;
+            }
             case Expression::Type::LITERAL: {
-                auto literalExpr = static_cast<LiteralExpr*>(expression);
+                auto literalExpr = static_cast<LiteralExpr const*>(expression);
+                ast["expression"].push_back({ "value", literalExpr->value });
+                break;
+            }
+            case Expression::Type::CALL: {
+                auto callStmt = static_cast<CallExpr const*>(expression);
 
-                ast = {{
-                    magic_enum::enum_name(literalExpr->expr_type()), {
-                        { "value", literalExpr->value }
-                    }
-                }};
+                ast["expression"].push_back({ "who", callStmt->who });
+                ast["expression"].push_back({ "arguments", nlohmann::json::array() });
+
+                for (auto const& child : callStmt->arguments)
+                {
+                    ast["expression"]["arguments"].push_back(dump_ast(child));
+                }
 
                 break;
             }

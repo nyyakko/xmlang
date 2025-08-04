@@ -2,6 +2,7 @@
 #include "Parser.hpp"
 
 #include "codegen/Compiler.hpp"
+#include "codegen/Assembler.hpp"
 
 #include <argparse/argparse.hpp>
 #include <fmt/format.h>
@@ -72,9 +73,11 @@ Result<void> safe_main(std::span<char const*> arguments)
         return {};
     }
 
-    std::ofstream(fmt::format("{}.kubo", [&] {
-        return cli.has_value("--output") ? cli.get<std::string>("--output") : "program";
-    }())) << assembly;
+    auto program = TRY(assemble(assembly));
+
+    auto output = [&] { return cli.has_value("--output") ? cli.get<std::string>("--output") : "program"; }();
+    std::ofstream stream(fmt::format("{}.kubo", output), std::ios::binary);
+    stream.write(reinterpret_cast<char const*>(program.data()), static_cast<int>(program.size()));
 
     return {};
 }

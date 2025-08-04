@@ -59,7 +59,14 @@ struct Expression : public Node
 {
     NODE_TYPE(Node::Type::EXPRESSION)
 
-    enum class Type { LITERAL, LOGICAL, ARITHMETIC };
+    enum class Type
+    {
+        ARG,
+        ARITHMETIC,
+        CALL,
+        LITERAL,
+        LOGICAL,
+    };
 
     constexpr virtual Type expr_type() const = 0;
 };
@@ -85,6 +92,21 @@ struct LiteralExpr : public Expression
     std::string value;
 };
 
+struct CallExpr : public Expression
+{
+    EXPR_TYPE(Expression::Type::CALL)
+
+    std::vector<std::unique_ptr<Node>> arguments {};
+    std::string who {};
+};
+
+struct ArgExpr : public Expression
+{
+    EXPR_TYPE(Expression::Type::ARG);
+
+    std::unique_ptr<Node> value {};
+};
+
 #define STMT_TYPE(TYPE)                                                       \
 constexpr virtual Statement::Type stmt_type() const override { return TYPE; } \
 
@@ -95,7 +117,6 @@ struct Statement : public Node
     // cppcheck-suppress [unknownMacro]
     enum class Type
     {
-        ARG,
         CALL,
         IF,
         LET,
@@ -111,13 +132,6 @@ struct CallStmt : public Statement
 
     std::vector<std::unique_ptr<Node>> arguments {};
     std::string who {};
-};
-
-struct ArgStmt : public Statement
-{
-    STMT_TYPE(Statement::Type::ARG);
-
-    std::unique_ptr<Node> value {};
 };
 
 struct RetStmt : public Statement

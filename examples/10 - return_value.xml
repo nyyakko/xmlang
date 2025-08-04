@@ -1,0 +1,15 @@
+<program>
+    <function name="foo" type="string" message="string">
+        <return value="${message}"></return>
+    </function>
+
+    <function name="main" type="none">
+        <call who="println">
+            <arg>
+                <call who="foo">
+                    <arg>Hello, World!</arg>
+                </call>
+            </arg>
+        </call>
+    </function>
+</program>
