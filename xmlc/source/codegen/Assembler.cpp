@@ -254,7 +254,7 @@ Result<std::vector<uint8_t>> assemble(std::string_view code)
     auto dataSegmentBytes = TRY(assemble_data_segment(dataSegment));
     auto codeSegmentBytes = TRY(assemble_code_segment(codeSegment));
 
-    std::ranges::copy("This is a V12 program", std::back_inserter(program));
+    std::ranges::copy("This is a kubo program", std::back_inserter(program));
     program.pop_back();
 
     // dataSegmentStart offset
