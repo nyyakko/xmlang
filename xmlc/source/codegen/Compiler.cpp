@@ -457,7 +457,7 @@ Result<std::string> compile(std::unique_ptr<Node> const& ast)
 
     std::string codeSegment = ".code\n";
     auto code = TRY(compile_program(static_cast<ProgramDecl const*>(ast.get())));
-    if (!code.empty()) codeSegment += fmt::format("\n{}\n", code);
+    if (!code.empty()) codeSegment += fmt::format("\n{}", code);
 
     return dataSegment + codeSegment;
 }
