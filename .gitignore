@@ -1,3 +1,5 @@
+*.kubo
+
 .clangd
 .cache/
 .vscode/
