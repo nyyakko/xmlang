@@ -1,8 +1,7 @@
+#include "codegen/Assembler.hpp"
+#include "codegen/Compiler.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
-
-#include "codegen/Compiler.hpp"
-#include "codegen/Assembler.hpp"
 
 #include <argparse/argparse.hpp>
 #include <fmt/format.h>
